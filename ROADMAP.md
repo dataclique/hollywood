@@ -34,12 +34,14 @@ project. The IR must make invalid timelines unrepresentable (no negative
 durations, no clip outside its source, exact rational time) and be cheap to
 construct and inspect in tests.
 
-- [ ] `crates/hollywood-timeline`: rational time / time range, frame & sample
-      rate newtypes
-- [ ] Timeline → tracks → clips/gaps; media-asset identity and relinking
-- [ ] Transition model (hard cut + audio cross-fade), constructed only in valid
+Delivered by #7 (#8).
+
+- [x] `crates/timeline`: rational time / time range, frame & sample rate
+      newtypes
+- [x] Timeline → tracks → clips/gaps; media-asset identity and relinking
+- [x] Transition model (hard cut + audio cross-fade), constructed only in valid
       positions
-- [ ] Property-based tests for the invariants
+- [x] Property-based tests for the invariants
 
 ## NLE export
 

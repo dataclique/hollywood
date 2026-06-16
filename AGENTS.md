@@ -94,7 +94,8 @@ developing; run `cargo clippy` and `cargo fmt` before committing.
 **Dependencies.** Add crates with `cargo add <crate>` — never hand-write version
 numbers (they get hallucinated). Shared dependencies live in the
 `[workspace.dependencies]` catalog in the root `Cargo.toml`; crates reference
-them with `<dep>.workspace = true`.
+them with `<dep>.workspace = true` (per the dotted-vs-block guidance under
+[Code Style](#code-style)).
 
 ### Version control
 
@@ -209,6 +210,16 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
 - **Comments.** Doc comments (how to use the code) are good. Comments narrating
   what the code does are not — make the code clear through naming and structure
   instead.
+- **Clear but concise — let the formatter decide the threshold.** The governing
+  rule is _clear first, concise second_, judged by how it reads **after the
+  formatter runs**, which differs by language:
+  - **TOML (taplo):** one key → dotted (`dep.workspace = true`); two or more
+    keys → inline table (`dep = { workspace = true, features = [...] }`), which
+    taplo keeps on one line.
+  - **Nix (nixfmt):** prefer the flattened dotted form (`a.b = x;` `a.c = y;`;
+    `services.foo.enable = true`) — nixfmt explodes a multi-attribute `{ … }`
+    onto separate lines, so reach for braces only when the grouping genuinely
+    aids clarity.
 
 ---
 
