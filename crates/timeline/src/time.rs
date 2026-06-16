@@ -8,7 +8,7 @@ use std::num::NonZeroU32;
 use std::ops::{Add, Sub};
 
 use num_rational::Rational64;
-use num_traits::{CheckedAdd, CheckedSub, ToPrimitive};
+use num_traits::{CheckedAdd, CheckedSub, Signed, ToPrimitive, Zero};
 
 use crate::error::TimelineError;
 
@@ -26,10 +26,15 @@ impl Seconds {
     /// Zero seconds.
     pub const ZERO: Self = Self(Rational64::new_raw(0, 1));
 
-    /// `numerator / denominator` seconds. Errors on a zero denominator.
+    /// `numerator / denominator` seconds. Errors on a zero denominator, and on
+    /// a negative denominator — write the sign on the numerator instead, so
+    /// `Seconds::new(1, -1)` is rejected rather than silently read as `-1`.
     pub fn new(numerator: i64, denominator: i64) -> Result<Self, TimelineError> {
         if denominator == 0 {
             return Err(TimelineError::ZeroDenominator);
+        }
+        if denominator < 0 {
+            return Err(TimelineError::NegativeDenominator);
         }
         Ok(Self(Rational64::new(numerator, denominator)))
     }
@@ -51,12 +56,12 @@ impl Seconds {
 
     /// Whether this value is strictly less than zero.
     pub fn is_negative(self) -> bool {
-        self.0 < Self::ZERO.0
+        self.0.is_negative()
     }
 
     /// Whether this value is exactly zero.
     pub fn is_zero(self) -> bool {
-        self.0 == Self::ZERO.0
+        self.0.is_zero()
     }
 
     /// This value as an `f64` number of seconds, for display and FFI.
@@ -143,10 +148,14 @@ pub struct TimeRange {
 
 impl TimeRange {
     /// A range starting at `start` lasting `duration`. Errors if `duration` is
-    /// negative.
+    /// negative, or if `start + duration` is not representable in exact `i64`
+    /// rational seconds — so [`end`](Self::end) can never overflow.
     pub fn new(start: Seconds, duration: Seconds) -> Result<Self, TimelineError> {
         if duration.is_negative() {
             return Err(TimelineError::NegativeDuration);
+        }
+        if start.checked_add(duration).is_none() {
+            return Err(TimelineError::TimeRangeOverflow);
         }
         Ok(Self { start, duration })
     }
@@ -166,7 +175,8 @@ impl TimeRange {
         self.duration
     }
 
-    /// The (exclusive) end instant, `start + duration`.
+    /// The (exclusive) end instant, `start + duration`. Cannot overflow:
+    /// [`new`](Self::new) rejects any range whose end is not representable.
     pub fn end(self) -> Seconds {
         self.start + self.duration
     }
@@ -209,6 +219,11 @@ mod tests {
     }
 
     #[test]
+    fn negative_denominator_is_rejected() {
+        assert_eq!(Seconds::new(1, -1), Err(TimelineError::NegativeDenominator));
+    }
+
+    #[test]
     fn rates_reject_zero() {
         assert_eq!(
             FrameRate::new(0, 1),
@@ -248,6 +263,18 @@ mod tests {
         assert_eq!(
             TimeRange::new(Seconds::ZERO, neg),
             Err(TimelineError::NegativeDuration)
+        );
+    }
+
+    #[test]
+    fn time_range_rejects_unrepresentable_end() {
+        // start + duration overflows i64, so end() would panic — reject at
+        // construction instead.
+        let near_max = Seconds::new(i64::MAX, 1).unwrap();
+        let one = Seconds::from_secs(1);
+        assert_eq!(
+            TimeRange::new(near_max, one),
+            Err(TimelineError::TimeRangeOverflow)
         );
     }
 

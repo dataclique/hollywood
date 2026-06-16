@@ -210,10 +210,12 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
 - **Newtypes over primitives.** Wrap domain quantities (rational time, frame
   rate, sample rate, track index) in types; don't pass raw `i64`/`f64` where a
   domain type clarifies intent and units.
-- **Package by feature, not by layer.** Each capability is a workspace crate
-  (`hollywood-timeline`, `hollywood-nle`, `hollywood-ffmpeg`, `hollywood-sync`,
-  `hollywood-detect`, `hollywood-pipeline`). Keep domain boundaries clean and
-  dependencies acyclic.
+- **Package by feature, not by layer.** Each capability is a workspace crate.
+  The directory drops the project prefix (`crates/timeline`, `crates/nle`,
+  `crates/ffmpeg`, …); the Cargo **package name** keeps it
+  (`hollywood-timeline`, `hollywood-nle`, …) so it stays unambiguous on
+  crates.io and in dependency lists. Keep domain boundaries clean and the
+  dependency graph acyclic.
 - **Error handling.** Use `thiserror` enums per crate; propagate with `?`. No
   panics in non-test code — model the failure.
 - **Module organization — public API first.** Within a module, order code so the
