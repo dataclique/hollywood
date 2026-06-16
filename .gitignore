@@ -1,0 +1,21 @@
+.devenv
+.direnv
+.pre-commit-config.yaml
+*~
+.DS_Store
+*.log
+.env
+/target
+
+# nix build output symlinks
+/result
+/result-*
+
+*.db
+*.db-shm
+*.db-wal
+.worktrees/
+.tmp/
+
+# but.nix installs the gitbutler agent skill as a symlink here
+/ai/skills/gitbutler
