@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::new(cli.log_level))
-        .init();
+        .try_init()?;
 
     hollywood::media::init()?;
     tracing::info!("hollywood foundation ready");
