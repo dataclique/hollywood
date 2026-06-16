@@ -4,7 +4,7 @@
 //! before it (clips and gaps occupy time; transitions overlap their
 //! neighbours). This mirrors the FCP7/xmeml track model.
 
-use crate::asset::AssetId;
+use crate::asset::MediaSource;
 use crate::error::TimelineError;
 use crate::time::{Seconds, TimeRange};
 
@@ -20,38 +20,38 @@ pub enum TrackKind {
 /// A placed reference to a span of a media asset.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Clip {
-    asset: AssetId,
-    source: TimeRange,
+    asset: MediaSource,
+    range: TimeRange,
     name: Option<String>,
 }
 
 impl Clip {
-    /// A clip of `source` from `asset`.
-    pub fn new(asset: AssetId, source: TimeRange) -> Self {
+    /// A clip of `range` from `asset`.
+    pub fn new(asset: MediaSource, range: TimeRange) -> Self {
         Self {
             asset,
-            source,
+            range,
             name: None,
         }
     }
 
     /// A clip with an explicit name (used by NLE exporters for relinking).
-    pub fn with_name(asset: AssetId, source: TimeRange, name: impl Into<String>) -> Self {
+    pub fn with_name(asset: MediaSource, range: TimeRange, name: impl Into<String>) -> Self {
         Self {
             asset,
-            source,
+            range,
             name: Some(name.into()),
         }
     }
 
     /// The asset this clip references.
-    pub fn asset(&self) -> &AssetId {
+    pub fn asset(&self) -> &MediaSource {
         &self.asset
     }
 
     /// The in/out range into the asset.
-    pub fn source(&self) -> TimeRange {
-        self.source
+    pub fn range(&self) -> TimeRange {
+        self.range
     }
 
     /// The clip's name, if set.
@@ -61,7 +61,7 @@ impl Clip {
 
     /// How long the clip occupies the track.
     pub fn duration(&self) -> Seconds {
-        self.source.duration()
+        self.range.duration()
     }
 }
 
@@ -203,7 +203,7 @@ mod tests {
 
     fn clip(seconds: i64) -> Clip {
         let range = TimeRange::from_origin(Seconds::from_secs(seconds)).unwrap();
-        Clip::new(AssetId::new("a"), range)
+        Clip::new(MediaSource::file("a.mov"), range)
     }
 
     #[test]

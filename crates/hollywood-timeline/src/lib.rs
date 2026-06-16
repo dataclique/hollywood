@@ -11,17 +11,18 @@
 //!
 //! ```
 //! use hollywood_timeline::{
-//!     AssetId, FrameRate, MediaAsset, Seconds, TimeRange, Timeline, Track, TrackKind, Clip,
+//!     Clip, FrameRate, MediaAsset, MediaSource, Seconds, TimeRange, Timeline, Track, TrackKind,
 //! };
 //!
 //! let mut timeline = Timeline::new("demo", FrameRate::whole(30).unwrap());
+//! let asset = MediaSource::file("a.mov");
 //! timeline
-//!     .add_asset(MediaAsset::new(AssetId::new("a"), Seconds::from_secs(10), None, None).unwrap())
+//!     .add_asset(MediaAsset::new(asset.clone(), Seconds::from_secs(10), None, None).unwrap())
 //!     .unwrap();
 //!
 //! let mut track = Track::new(TrackKind::Video);
-//! let source = TimeRange::new(Seconds::from_secs(1), Seconds::from_secs(4)).unwrap();
-//! track.push_clip(Clip::new(AssetId::new("a"), source));
+//! let range = TimeRange::new(Seconds::from_secs(1), Seconds::from_secs(4)).unwrap();
+//! track.push_clip(Clip::new(asset, range));
 //! timeline.add_track(track);
 //!
 //! timeline.validate().unwrap();
@@ -34,7 +35,7 @@ pub mod track;
 
 mod error;
 
-pub use asset::{AssetId, AudioProperties, ChannelLayout, MediaAsset, VideoProperties};
+pub use asset::{AudioProperties, ChannelLayout, MediaAsset, MediaSource, VideoProperties};
 pub use error::TimelineError;
 pub use time::{FrameRate, SampleRate, Seconds, TimeRange};
 pub use timeline::Timeline;

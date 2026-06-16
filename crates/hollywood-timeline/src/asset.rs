@@ -2,30 +2,43 @@
 
 use std::fmt;
 use std::num::NonZeroU16;
+use std::path::PathBuf;
 
 use crate::error::TimelineError;
 use crate::time::{FrameRate, SampleRate, Seconds};
 
-/// Stable identity of a media asset within a timeline. Clips relink to assets
-/// by this id, so it must be unique within a timeline.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct AssetId(String);
+/// Where a media asset's bytes come from — and, since the same file is the same
+/// asset, its identity within a timeline.
+///
+/// Modeled as an enum so a new kind of source (a remote URL, a capture device)
+/// becomes a new variant rather than another meaning smuggled into a string.
+/// [`Display`] produces the on-the-wire path; [`file_name`](Self::file_name)
+/// extracts the leaf for labels.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum MediaSource {
+    /// A local file on disk.
+    File(PathBuf),
+}
 
-impl AssetId {
-    /// Wrap a string as an asset id.
-    pub fn new(id: impl Into<String>) -> Self {
-        Self(id.into())
+impl MediaSource {
+    /// A source backed by a local file.
+    pub fn file(path: impl Into<PathBuf>) -> Self {
+        Self::File(path.into())
     }
 
-    /// The id as a string slice.
-    pub fn as_str(&self) -> &str {
-        &self.0
+    /// The leaf file name, if the path has one — used as a clip/relink label.
+    pub fn file_name(&self) -> Option<&str> {
+        match self {
+            Self::File(path) => path.file_name().and_then(|name| name.to_str()),
+        }
     }
 }
 
-impl fmt::Display for AssetId {
+impl fmt::Display for MediaSource {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
+        match self {
+            Self::File(path) => write!(f, "{}", path.display()),
+        }
     }
 }
 
@@ -78,10 +91,11 @@ pub struct AudioProperties {
     pub channels: ChannelLayout,
 }
 
-/// A source media file a timeline can place clips from.
+/// A source media file a timeline can place clips from, identified by its
+/// [`MediaSource`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MediaAsset {
-    id: AssetId,
+    source: MediaSource,
     duration: Seconds,
     video: Option<VideoProperties>,
     audio: Option<AudioProperties>,
@@ -91,7 +105,7 @@ impl MediaAsset {
     /// A media asset with the given probed properties. Errors on a negative
     /// duration.
     pub fn new(
-        id: AssetId,
+        source: MediaSource,
         duration: Seconds,
         video: Option<VideoProperties>,
         audio: Option<AudioProperties>,
@@ -100,16 +114,16 @@ impl MediaAsset {
             return Err(TimelineError::NegativeDuration);
         }
         Ok(Self {
-            id,
+            source,
             duration,
             video,
             audio,
         })
     }
 
-    /// This asset's id.
-    pub fn id(&self) -> &AssetId {
-        &self.id
+    /// This asset's source — its identity.
+    pub fn source(&self) -> &MediaSource {
+        &self.source
     }
 
     /// This asset's total duration.

@@ -194,6 +194,19 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
 - **No boolean blindness.** Prefer discriminated unions
   (`enum Fade { In, Out }`) over bare `bool`s; when a boolean is unavoidable,
   wrap it in named constructors rather than exposing `set_x(true/false)`.
+- **Model the value, not a `String`.** Every identifier and domain value gets a
+  type that captures its actual structure — a newtype wrapping `String` that
+  encodes nothing is still a bug, and a type alias (`type X = Y`) is not a type
+  at all (the compiler can't tell it apart). Choose the shape by what determines
+  the value:
+  - opaque and randomly generated → wrap a `Ulid`/`Uuid`, not `String`;
+  - composed of N values → a struct with those N fields;
+  - one of N kinds → an enum with N variants (e.g. `MediaSource::File(PathBuf)`,
+    extensible to a URL without touching call sites).
+
+  Put the string conversion on the type itself (`Display`/`FromStr`), defined in
+  exactly one place, so formatting and parsing never spread across call sites as
+  `format!(...)` and ad-hoc parsers.
 - **Newtypes over primitives.** Wrap domain quantities (rational time, frame
   rate, sample rate, track index) in types; don't pass raw `i64`/`f64` where a
   domain type clarifies intent and units.

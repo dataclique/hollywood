@@ -1,6 +1,6 @@
 //! The timeline: a registry of media assets and the tracks that reference them.
 
-use crate::asset::{AssetId, MediaAsset};
+use crate::asset::{MediaAsset, MediaSource};
 use crate::error::TimelineError;
 use crate::time::FrameRate;
 use crate::track::{Track, TrackItem};
@@ -50,16 +50,16 @@ impl Timeline {
 
     /// Register a media asset. Errors on a duplicate id.
     pub fn add_asset(&mut self, asset: MediaAsset) -> Result<(), TimelineError> {
-        if self.asset(asset.id()).is_some() {
-            return Err(TimelineError::DuplicateAsset(asset.id().to_string()));
+        if self.asset(asset.source()).is_some() {
+            return Err(TimelineError::DuplicateAsset(asset.source().clone()));
         }
         self.assets.push(asset);
         Ok(())
     }
 
-    /// Look up a registered asset by id.
-    pub fn asset(&self, id: &AssetId) -> Option<&MediaAsset> {
-        self.assets.iter().find(|asset| asset.id() == id)
+    /// Look up a registered asset by its source.
+    pub fn asset(&self, source: &MediaSource) -> Option<&MediaAsset> {
+        self.assets.iter().find(|asset| asset.source() == source)
     }
 
     /// Append a track and return its index.
@@ -79,12 +79,12 @@ impl Timeline {
                 if let TrackItem::Clip(clip) = item {
                     let asset = self
                         .asset(clip.asset())
-                        .ok_or_else(|| TimelineError::UnknownAsset(clip.asset().to_string()))?;
-                    let source = clip.source();
-                    if source.duration().is_zero() {
+                        .ok_or_else(|| TimelineError::UnknownAsset(clip.asset().clone()))?;
+                    let range = clip.range();
+                    if range.duration().is_zero() {
                         return Err(TimelineError::EmptyClip);
                     }
-                    if source.start().is_negative() || source.end() > asset.duration() {
+                    if range.start().is_negative() || range.end() > asset.duration() {
                         return Err(TimelineError::ClipOutOfAssetBounds);
                     }
                 }
@@ -103,7 +103,7 @@ mod tests {
 
     fn audio_asset(id: &str, seconds: i64) -> MediaAsset {
         MediaAsset::new(
-            AssetId::new(id),
+            MediaSource::file(id),
             Seconds::from_secs(seconds),
             None,
             Some(AudioProperties {
@@ -124,7 +124,7 @@ mod tests {
         timeline.add_asset(audio_asset("a", 10)).unwrap();
         assert_eq!(
             timeline.add_asset(audio_asset("a", 5)),
-            Err(TimelineError::DuplicateAsset("a".to_owned()))
+            Err(TimelineError::DuplicateAsset(MediaSource::file("a")))
         );
     }
 
@@ -133,11 +133,11 @@ mod tests {
         let mut timeline = Timeline::new("t", fps());
         let mut track = Track::new(TrackKind::Audio);
         let range = TimeRange::from_origin(Seconds::from_secs(2)).unwrap();
-        track.push_clip(Clip::new(AssetId::new("missing"), range));
+        track.push_clip(Clip::new(MediaSource::file("missing"), range));
         timeline.add_track(track);
         assert_eq!(
             timeline.validate(),
-            Err(TimelineError::UnknownAsset("missing".to_owned()))
+            Err(TimelineError::UnknownAsset(MediaSource::file("missing")))
         );
     }
 
@@ -147,7 +147,7 @@ mod tests {
         timeline.add_asset(audio_asset("a", 3)).unwrap();
         let mut track = Track::new(TrackKind::Audio);
         let range = TimeRange::new(Seconds::from_secs(2), Seconds::from_secs(2)).unwrap();
-        track.push_clip(Clip::new(AssetId::new("a"), range));
+        track.push_clip(Clip::new(MediaSource::file("a"), range));
         timeline.add_track(track);
         assert_eq!(
             timeline.validate(),
@@ -162,7 +162,7 @@ mod tests {
         let mut track = Track::new(TrackKind::Audio);
         // start = -1s, duration = 2s: a valid TimeRange but out of asset bounds.
         let range = TimeRange::new(Seconds::new(-1, 1).unwrap(), Seconds::from_secs(2)).unwrap();
-        track.push_clip(Clip::new(AssetId::new("a"), range));
+        track.push_clip(Clip::new(MediaSource::file("a"), range));
         timeline.add_track(track);
         assert_eq!(
             timeline.validate(),
@@ -176,7 +176,7 @@ mod tests {
         timeline.add_asset(audio_asset("a", 10)).unwrap();
         let mut track = Track::new(TrackKind::Audio);
         let range = TimeRange::new(Seconds::from_secs(1), Seconds::ZERO).unwrap();
-        track.push_clip(Clip::new(AssetId::new("a"), range));
+        track.push_clip(Clip::new(MediaSource::file("a"), range));
         timeline.add_track(track);
         assert_eq!(timeline.validate(), Err(TimelineError::EmptyClip));
     }
@@ -187,7 +187,7 @@ mod tests {
         timeline.add_asset(audio_asset("a", 10)).unwrap();
         let mut track = Track::new(TrackKind::Audio);
         let range = TimeRange::new(Seconds::from_secs(1), Seconds::from_secs(4)).unwrap();
-        track.push_clip(Clip::new(AssetId::new("a"), range));
+        track.push_clip(Clip::new(MediaSource::file("a"), range));
         timeline.add_track(track);
         assert_eq!(timeline.validate(), Ok(()));
     }

@@ -2,6 +2,8 @@
 
 use thiserror::Error;
 
+use crate::asset::MediaSource;
+
 /// Failure building or validating a timeline IR value.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum TimelineError {
@@ -30,13 +32,13 @@ pub enum TimelineError {
     #[error("duration must be positive")]
     NonPositiveDuration,
 
-    /// Two assets were registered under the same id.
-    #[error("duplicate asset id: {0}")]
-    DuplicateAsset(String),
+    /// Two assets were registered under the same source.
+    #[error("duplicate asset: {0}")]
+    DuplicateAsset(MediaSource),
 
     /// A clip referenced an asset not registered in the timeline.
-    #[error("clip references unknown asset id: {0}")]
-    UnknownAsset(String),
+    #[error("clip references unknown asset: {0}")]
+    UnknownAsset(MediaSource),
 
     /// A clip's source range has zero duration.
     #[error("a clip's source range must have positive duration")]
