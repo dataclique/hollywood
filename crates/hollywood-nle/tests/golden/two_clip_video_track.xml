@@ -21,6 +21,7 @@
             <out>150</out>
             <file id="a.mov">
               <name>a.mov</name>
+              <pathurl>a.mov</pathurl>
             </file>
           </clipitem>
           <clipitem>
@@ -35,6 +36,7 @@
             <out>420</out>
             <file id="b.mov">
               <name>b.mov</name>
+              <pathurl>b.mov</pathurl>
             </file>
           </clipitem>
         </track>

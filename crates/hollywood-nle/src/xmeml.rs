@@ -99,8 +99,11 @@ fn write_clipitem(
     start_frame: i64,
     end_frame: i64,
 ) -> Result<(), NleError> {
+    let source = clip.asset();
+    let file_id = source.file_name().unwrap_or("clip");
+    let name = clip.name().or_else(|| source.file_name()).unwrap_or("clip");
+
     start(writer, "clipitem")?;
-    let name = clip.name().unwrap_or_else(|| clip.asset().as_str());
     text_element(writer, "name", name)?;
     write_rate(writer, rate)?;
     text_element(writer, "start", &start_frame.to_string())?;
@@ -108,18 +111,19 @@ fn write_clipitem(
     text_element(
         writer,
         "in",
-        &clip.source().start().to_frames(rate).to_string(),
+        &clip.range().start().to_frames(rate).to_string(),
     )?;
     text_element(
         writer,
         "out",
-        &clip.source().end().to_frames(rate).to_string(),
+        &clip.range().end().to_frames(rate).to_string(),
     )?;
 
     let mut file = BytesStart::new("file");
-    file.push_attribute(("id", clip.asset().as_str()));
+    file.push_attribute(("id", file_id));
     write(writer, Event::Start(file))?;
-    text_element(writer, "name", clip.asset().as_str())?;
+    text_element(writer, "name", file_id)?;
+    text_element(writer, "pathurl", &source.to_string())?;
     write(writer, Event::End(BytesEnd::new("file")))?;
 
     end(writer, "clipitem")

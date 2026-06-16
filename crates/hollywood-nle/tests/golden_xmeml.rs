@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use hollywood_nle::to_xmeml;
 use hollywood_timeline::{
-    AssetId, Clip, FrameRate, Gap, MediaAsset, Seconds, TimeRange, Timeline, Track, TrackKind,
+    Clip, FrameRate, Gap, MediaAsset, MediaSource, Seconds, TimeRange, Timeline, Track, TrackKind,
     Transition,
 };
 
@@ -16,20 +16,20 @@ fn two_clip_video_track_matches_golden() {
     for id in ["a.mov", "b.mov"] {
         timeline
             .add_asset(
-                MediaAsset::new(AssetId::new(id), Seconds::from_secs(60), None, None).unwrap(),
+                MediaAsset::new(MediaSource::file(id), Seconds::from_secs(60), None, None).unwrap(),
             )
             .unwrap();
     }
 
     let mut track = Track::new(TrackKind::Video);
     track.push_clip(Clip::with_name(
-        AssetId::new("a.mov"),
+        MediaSource::file("a.mov"),
         TimeRange::new(Seconds::from_secs(2), Seconds::from_secs(3)).unwrap(),
         "intro",
     ));
     track.push_gap(Gap::new(Seconds::from_secs(1)).unwrap());
     track.push_clip(Clip::with_name(
-        AssetId::new("b.mov"),
+        MediaSource::file("b.mov"),
         TimeRange::new(Seconds::from_secs(10), Seconds::from_secs(4)).unwrap(),
         "outro",
     ));
@@ -44,20 +44,26 @@ fn transitions_are_rejected_for_now() {
     let mut timeline = Timeline::new("demo", FrameRate::whole(30).unwrap());
     timeline
         .add_asset(
-            MediaAsset::new(AssetId::new("a.mov"), Seconds::from_secs(60), None, None).unwrap(),
+            MediaAsset::new(
+                MediaSource::file("a.mov"),
+                Seconds::from_secs(60),
+                None,
+                None,
+            )
+            .unwrap(),
         )
         .unwrap();
 
     let mut track = Track::new(TrackKind::Video);
     track.push_clip(Clip::new(
-        AssetId::new("a.mov"),
+        MediaSource::file("a.mov"),
         TimeRange::new(Seconds::ZERO, Seconds::from_secs(2)).unwrap(),
     ));
     track
         .push_transition(Transition::cross_fade(Seconds::from_secs(1)).unwrap())
         .unwrap();
     track.push_clip(Clip::new(
-        AssetId::new("a.mov"),
+        MediaSource::file("a.mov"),
         TimeRange::new(Seconds::from_secs(3), Seconds::from_secs(2)).unwrap(),
     ));
     timeline.add_track(track);
