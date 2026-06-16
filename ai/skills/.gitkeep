@@ -1,0 +1,6 @@
+# Shared agent skills directory.
+#
+# `.claude/skills` and `.cursor/skills` are symlinks to this directory, so both
+# coding agents see the same skills. The gitbutler skill is installed here as
+# `ai/skills/gitbutler` by the but.nix dev shell on shell entry; it is a symlink
+# into the Nix store and is gitignored (see /.gitignore).
