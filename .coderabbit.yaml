@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+reviews:
+  # Request changes when there are open issues; approve once they are resolved.
+  request_changes_workflow: true
+
+  auto_review:
+    # Review PRs targeting any base branch (stacked PRs target feature branches).
+    base_branches:
+      - ".*"
+
+  profile: assertive
+  review_details: true
+  collapse_walkthrough: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  auto_apply_labels: true
+
+  # Solo project — the author self-reviews; don't auto-assign human reviewers.
+  auto_assign_reviewers: false
+  poem: false
+
+  path_instructions:
+    - path: "*"
+      instructions: >-
+        Focus on providing constructive criticism. Whenever you see a suboptimal
+        approach, suggest more idiomatic or robust alternative(s). Flag potential
+        footguns. Suggest functional alternatives to mutable/imperative code.
+        Point out architectural flaws like leaky abstractions, tight coupling,
+        wrong level of abstraction, poor type modeling, over-abstraction, or
+        unclear domain boundaries. Code should be organized by business/domain
+        concern rather than technical layer — flag violations. Point out gaps in
+        test coverage, but prefer tests that assert domain invariants and
+        behavior over tests coupled to implementation details.
+
+    - path: "**/*.rs"
+      instructions: >-
+        Hollywood denies panics in non-test code (no unwrap/expect/panic/
+        indexing) and runs clippy pedantic + nursery; flag anything that would
+        need a lint allow. Favor making invalid states unrepresentable via the
+        type system (newtypes over primitives, discriminated unions over
+        booleans), exact rational time over floats, and per-crate thiserror
+        enums. The timeline IR is the shared vocabulary — keep NLE/format and
+        media-backend concerns out of it. For the NLE exporters, expect
+        golden-file tests; for detection/sync, expect tests on realistic media
+        shapes rather than contrived inputs.
+
+    - path: "**/*.md"
+      instructions: >-
+        Focus on the contents of the docs, not cosmetic markdown formatting.
+        These include the system spec (SPEC.md), the plan (ROADMAP.md), the
+        domain glossary (docs/glossary.md), architecture decision records
+        (adrs/), AI-contributor guidelines (AGENTS.md), and the human-facing
+        README.md / CONTRIBUTING.md. Consider the target audience. For specs and
+        ADRs, suggest product, architectural, and correctness improvements and
+        flag claims that look unverified. For the roadmap, suggest changes that
+        make work more parallelizable and deliverable-focused. For guidelines,
+        suggest better rules and flag missing ones. Throughout, flag needless
+        bloat and prefer clear, concise writing.
