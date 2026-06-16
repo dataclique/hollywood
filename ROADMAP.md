@@ -50,8 +50,8 @@ worthless if it won't open in the editor's NLE. Get a hard-cut **xmeml** export
 opening natively in _both_ Premiere and Resolve, proven by golden files, before
 attempting transitions or FCPXML.
 
-- [ ] `crates/hollywood-nle`: golden-file test harness
-- [ ] FCP7 **xmeml** writer — multi-track, hard cuts (primary Premiere+Resolve
+- [x] `crates/hollywood-nle`: golden-file test harness
+- [x] FCP7 **xmeml** writer — multi-track, hard cuts (primary Premiere+Resolve
       path)
 - [ ] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
 - [ ] Audio cross-fade transitions (separate, validated against real imports)

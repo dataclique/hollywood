@@ -5,7 +5,7 @@
 //! drift.
 
 use std::num::NonZeroU32;
-use std::ops::{Add, Sub};
+use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use num_rational::Rational64;
 use num_traits::{CheckedAdd, CheckedSub, Signed, ToPrimitive, Zero};
@@ -54,6 +54,15 @@ impl Seconds {
         Self(Rational64::new(samples, i64::from(rate.0.get())))
     }
 
+    /// The number of whole frames this duration spans at `rate`, rounded to the
+    /// nearest frame. This is lossy for a sub-frame duration; to test exact
+    /// frame alignment use the round-trip guard `from_frames(to_frames(t)) == t`
+    /// rather than treating this as the inverse of
+    /// [`from_frames`](Self::from_frames).
+    pub fn to_frames(self, rate: FrameRate) -> i64 {
+        (self.0 * rate.0).round().to_integer()
+    }
+
     /// Whether this value is strictly less than zero.
     pub fn is_negative(self) -> bool {
         self.0.is_negative()
@@ -94,6 +103,18 @@ impl Sub for Seconds {
     }
 }
 
+impl AddAssign for Seconds {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 += rhs.0;
+    }
+}
+
+impl SubAssign for Seconds {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 -= rhs.0;
+    }
+}
+
 /// Frames per second, an exact rational (e.g. `30000/1001` for 29.97 fps).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FrameRate(Rational64);
@@ -118,6 +139,16 @@ impl FrameRate {
     /// This rate as an `f64` (frames per second).
     pub fn as_f64(self) -> f64 {
         self.0.to_f64().unwrap_or(f64::NAN)
+    }
+
+    /// The whole frames per second, if this rate is an integer — i.e. not a
+    /// fractional NTSC rate like `30000/1001`.
+    pub fn as_whole(self) -> Option<u32> {
+        if *self.0.denom() == 1 {
+            u32::try_from(*self.0.numer()).ok()
+        } else {
+            None
+        }
     }
 }
 
@@ -201,6 +232,13 @@ mod tests {
         let rate = FrameRate::new(30000, 1001).unwrap();
         // 30000 frames at 29.97 fps is exactly 1001 seconds, with no drift.
         assert_eq!(Seconds::from_frames(30000, rate), Seconds::from_secs(1001));
+    }
+
+    #[test]
+    fn seconds_round_trip_through_frames() {
+        let rate = FrameRate::whole(24).unwrap();
+        assert_eq!(Seconds::from_secs(2).to_frames(rate), 48);
+        assert_eq!(Seconds::from_frames(48, rate).to_frames(rate), 48);
     }
 
     #[test]

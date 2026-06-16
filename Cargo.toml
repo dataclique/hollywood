@@ -49,6 +49,10 @@ apalis-sql = { version = "0.7.4", features = ["sqlite"] }
 num-rational = "0.4"
 num-traits = "0.2"
 proptest = "1"
+quick-xml = "0.40"
+
+# Intra-workspace crates.
+hollywood-timeline.path = "crates/hollywood-timeline"
 
 [package]
 name = "hollywood"

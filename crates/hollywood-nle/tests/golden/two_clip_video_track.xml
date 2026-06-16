@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmeml version="5">
+  <sequence>
+    <name>demo</name>
+    <rate>
+      <timebase>30</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <media>
+      <video>
+        <track>
+          <clipitem>
+            <name>intro</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>90</end>
+            <in>60</in>
+            <out>150</out>
+            <file id="a.mov">
+              <name>a.mov</name>
+            </file>
+          </clipitem>
+          <clipitem>
+            <name>outro</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>120</start>
+            <end>240</end>
+            <in>300</in>
+            <out>420</out>
+            <file id="b.mov">
+              <name>b.mov</name>
+            </file>
+          </clipitem>
+        </track>
+      </video>
+    </media>
+  </sequence>
+</xmeml>
