@@ -52,7 +52,7 @@ proptest = "1"
 quick-xml = "0.40"
 
 # Intra-workspace crates.
-hollywood-timeline.path = "crates/hollywood-timeline"
+hollywood-timeline.path = "crates/timeline"
 
 [package]
 name = "hollywood"

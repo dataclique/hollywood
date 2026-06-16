@@ -19,7 +19,7 @@
             <end>90</end>
             <in>60</in>
             <out>150</out>
-            <file id="a.mov">
+            <file id="file-1">
               <name>a.mov</name>
               <pathurl>a.mov</pathurl>
             </file>
@@ -34,7 +34,7 @@
             <end>240</end>
             <in>300</in>
             <out>420</out>
-            <file id="b.mov">
+            <file id="file-2">
               <name>b.mov</name>
               <pathurl>b.mov</pathurl>
             </file>

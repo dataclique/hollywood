@@ -9,9 +9,16 @@ let
 
   # Keep clippy.toml alongside the standard Cargo sources so the lint
   # derivation honours the in-tree allow-list (unwrap/expect/indexing in tests).
+  # Keep the checked-in NLE golden fixtures too: craneLib.filterCargoSources
+  # drops non-Rust files, but the golden-file exporter tests read them at
+  # runtime, so they must survive into the build sandbox.
   src = lib.cleanSourceWith {
     src = ./.;
-    filter = path: type: (craneLib.filterCargoSources path type) || (lib.hasSuffix "clippy.toml" path);
+    filter =
+      path: type:
+      (craneLib.filterCargoSources path type)
+      || (lib.hasSuffix "clippy.toml" path)
+      || (lib.hasInfix "/tests/golden/" path);
   };
 
   commonArgs = {
