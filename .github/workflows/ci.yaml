@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Nix is installed via nix-quick-install-action; the shared `data-cartel` Cachix
+# (cachix-action) and the per-runner nix store (cache-nix-action) are warmed
+# before any `nix` build. cachix-action is continue-on-error so a fork PR (no
+# CACHIX_AUTH_TOKEN) still builds against the public cache without failing.
+
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nixbuild/nix-quick-install-action@v34
+        with:
+          nix_version: "2.31.2"
+          nix_conf: |
+            accept-flake-config = true
+            fallback = true
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            keep-env-derivations = true
+            keep-outputs = true
+
+      - uses: cachix/cachix-action@v15
+        continue-on-error: true
+        with:
+          name: data-cartel-public
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
+
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 8G
+
+      - name: Pre-commit hooks
+        # Pure flake check -- runs the same hooks without the heavy devShell
+        run: nix build -L --log-format raw .#checks.x86_64-linux.git-hooks
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: nixbuild/nix-quick-install-action@v34
+        with:
+          nix_version: "2.31.2"
+          nix_conf: |
+            accept-flake-config = true
+            fallback = true
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            keep-env-derivations = true
+            keep-outputs = true
+
+      - uses: cachix/cachix-action@v15
+        continue-on-error: true
+        with:
+          name: data-cartel-public
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
+
+      - uses: nix-community/cache-nix-action@v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 8G
+
+      - name: Test
+        run: nix build -L --log-format raw .#hollywood-test
+
+      - name: Clippy
+        run: nix build -L --log-format raw .#hollywood-clippy
