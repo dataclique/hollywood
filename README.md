@@ -12,11 +12,18 @@ hand-written XML adapters, `ffmpeg-next` for media I/O, `rustfft` for
 cross-correlation audio sync, RMS/peak + Silero VAD for silence detection, and
 `egui`/`eframe` for the desktop GUI.
 
-> **Status:** early foundation. This repository currently establishes the Nix
-> toolchain, the Cargo workspace, and the project's engineering conventions. The
-> timeline IR, NLE exporters, media pipeline, and desktop app land in subsequent
-> stacked pull requests. See [`SPEC.md`](./SPEC.md) and
-> [`ROADMAP.md`](./ROADMAP.md) once they are added.
+> **Status:** foundation in progress. The timeline IR, NLE exporters, and media
+> probe crate are in the tree; the `egui` desktop shell is runnable for picking
+> footage and choosing export targets. Silence detection, sync, pipeline
+> orchestration, and full export wiring land in stacked pull requests. See
+> [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
+
+## Running
+
+```bash
+cargo run              # opens the desktop shell (default)
+cargo run -- init      # headless smoke check for CI
+```
 
 ## Development
 

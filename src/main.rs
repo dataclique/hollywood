@@ -1,10 +1,7 @@
-//! Hollywood entry point.
-//!
-//! The foundation binary initializes logging and the media backend and reports
-//! readiness. The `egui` desktop shell and the processing subcommands (probe,
-//! detect, sync, export) land in later crates.
+//! Hollywood entry point — desktop shell by default; headless foundation mode
+//! for CI until the CLI pipeline lands.
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
 /// Hollywood — video pre-editing automation.
@@ -14,10 +11,20 @@ struct Cli {
     /// Log filter directive (overridden by the `RUST_LOG` environment variable).
     #[arg(long, env = "RUST_LOG", default_value = "info")]
     log_level: String,
+
+    #[command(subcommand)]
+    command: Option<Command>,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Launch the desktop shell (default).
+    Gui,
+    /// Initialize subsystems and exit — for CI and headless smoke checks.
+    Init,
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cli = Cli::parse();
 
     tracing_subscriber::fmt()
@@ -25,7 +32,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .try_init()?;
 
     hollywood::media::init()?;
-    tracing::info!("hollywood foundation ready");
+
+    match cli.command {
+        None | Some(Command::Gui) => hollywood_gui::run()?,
+        Some(Command::Init) => tracing::info!("hollywood foundation ready"),
+    }
 
     Ok(())
 }
