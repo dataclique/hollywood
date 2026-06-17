@@ -1,0 +1,16 @@
+[package]
+name = "hollywood-ffmpeg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "FFmpeg-backed media probing/decoding for Hollywood, behind a backend-swappable trait."
+
+[dependencies]
+ffmpeg-next.workspace = true
+hollywood-timeline.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
