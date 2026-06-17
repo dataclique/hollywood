@@ -216,7 +216,14 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
   (`hollywood-timeline`, `hollywood-nle`, …) so it stays unambiguous on
   crates.io and in dependency lists. Keep domain boundaries clean and the
   dependency graph acyclic.
-- **Error handling.** Use `thiserror` enums per crate; propagate with `?`. No
+- **Error handling.** Use `thiserror` enums per crate; propagate with `?`. Add a
+  variant with `#[from]` for each error type you need to surface — callers then
+  use `?` and keep the full error chain. Almost never use `.map_err`: it
+  discards information and duplicates variants you already have. The rare
+  exception is a boundary you do not control (a trait whose associated `Error`
+  type is fixed, a foreign callback signature) where you must convert into an
+  existing type — even then, prefer wrapping the underlying error on your enum
+  (`#[from]` / `#[source]`) over `.map_err(|_| YourEnum::SomethingGeneric)`. No
   panics in non-test code — model the failure.
 - **Module organization — public API first.** Within a module, order code so the
   most important things appear first: public types/traits, then public
