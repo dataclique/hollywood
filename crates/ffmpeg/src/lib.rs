@@ -5,6 +5,9 @@
 //! to a timeline [`hollywood_timeline::MediaAsset`]. The [`MediaProbe`] trait
 //! keeps callers backend-agnostic, so a pure-Rust backend (Symphonia) can be
 //! swapped in without touching the pipeline.
+//!
+//! Callers must invoke [`ffmpeg_next::init`] once at process startup before any
+//! probe — the root binary's `media::init` wrapper handles this for the app.
 
 pub mod probe;
 

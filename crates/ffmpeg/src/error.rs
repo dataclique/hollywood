@@ -18,20 +18,12 @@ pub enum MediaError {
     #[error("media reported no usable duration")]
     UnknownDuration,
 
-    /// A stream's frame rate was zero or otherwise invalid.
-    #[error("media reported an invalid frame rate")]
-    InvalidFrameRate,
+    /// Stream metadata does not fit a typed domain bound (e.g. frame-rate
+    /// numerator overflowed `u32`).
+    #[error("stream metadata does not fit typed domain bounds: {0}")]
+    MetadataBounds(#[from] std::num::TryFromIntError),
 
-    /// A stream's sample rate was zero.
-    #[error("media reported an invalid sample rate")]
-    InvalidSampleRate,
-
-    /// A stream reported a zero/unreadable channel count — channel metadata was
-    /// unavailable, not genuinely mono.
-    #[error("media reported an invalid channel layout")]
-    InvalidChannelLayout,
-
-    /// The probed properties could not form a valid timeline asset.
-    #[error("probed media is not a valid asset: {0}")]
-    Asset(#[from] TimelineError),
+    /// The timeline IR rejected probed or converted values.
+    #[error("timeline IR rejected probed values: {0}")]
+    Timeline(#[from] TimelineError),
 }

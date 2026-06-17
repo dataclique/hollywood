@@ -150,11 +150,9 @@ fn probe_video(stream: &Stream<'_>) -> Result<VideoProperties, MediaError> {
     } else {
         stream.rate()
     };
-    let numerator = u32::try_from(rate.numerator()).map_err(|_| MediaError::InvalidFrameRate)?;
-    let denominator =
-        u32::try_from(rate.denominator()).map_err(|_| MediaError::InvalidFrameRate)?;
-    let frame_rate =
-        FrameRate::new(numerator, denominator).map_err(|_| MediaError::InvalidFrameRate)?;
+    let numerator = u32::try_from(rate.numerator())?;
+    let denominator = u32::try_from(rate.denominator())?;
+    let frame_rate = FrameRate::new(numerator, denominator)?;
 
     Ok(VideoProperties {
         frame_rate,
@@ -168,19 +166,10 @@ fn probe_audio(stream: &Stream<'_>) -> Result<AudioProperties, MediaError> {
         .decoder()
         .audio()?;
 
-    let sample_rate = SampleRate::new(decoder.rate()).map_err(|_| MediaError::InvalidSampleRate)?;
-
     Ok(AudioProperties {
-        sample_rate,
-        channels: channel_layout(decoder.channels())?,
+        sample_rate: SampleRate::new(decoder.rate())?,
+        channels: ChannelLayout::channels(decoder.channels())?,
     })
-}
-
-/// Map a decoder channel count onto the IR layout, deferring the
-/// mono/stereo canonicalization to the IR's own constructor. A zero count means
-/// the decoder could not read channel info — that is an error, not genuine mono.
-fn channel_layout(count: u16) -> Result<ChannelLayout, MediaError> {
-    ChannelLayout::channels(count).map_err(|_| MediaError::InvalidChannelLayout)
 }
 
 #[cfg(test)]
@@ -191,14 +180,17 @@ mod tests {
 
     #[test]
     fn channel_layout_maps_counts() {
-        assert_eq!(channel_layout(1).unwrap(), ChannelLayout::Mono);
-        assert_eq!(channel_layout(2).unwrap(), ChannelLayout::Stereo);
+        assert_eq!(ChannelLayout::channels(1).unwrap(), ChannelLayout::Mono);
+        assert_eq!(ChannelLayout::channels(2).unwrap(), ChannelLayout::Stereo);
         assert_eq!(
-            channel_layout(6).unwrap(),
+            ChannelLayout::channels(6).unwrap(),
             ChannelLayout::Channels(NonZeroU16::new(6).unwrap())
         );
         // A degenerate zero-channel report is an error, not a silent mono fallback.
-        assert!(channel_layout(0).is_err());
+        assert_eq!(
+            ChannelLayout::channels(0),
+            Err(hollywood_timeline::TimelineError::ZeroChannelCount)
+        );
     }
 
     #[test]
