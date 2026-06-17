@@ -1,0 +1,16 @@
+[package]
+name = "hollywood-nle"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Hand-written NLE interchange exporters (FCP7 xmeml, FCPXML) for the Hollywood timeline IR."
+
+[dependencies]
+hollywood-timeline.workspace = true
+quick-xml.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
