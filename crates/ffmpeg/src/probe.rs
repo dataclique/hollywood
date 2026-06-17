@@ -54,12 +54,10 @@ impl MediaProbe for FfmpegProbe {
         let input = format::input(path)?;
 
         // Cover art (an embedded thumbnail on an audio file) is exposed as a
-        // still-image video stream; selecting it would mislabel an audio-only
-        // file as video, so skip it.
-        let video_stream = input
-            .streams()
-            .best(Type::Video)
-            .filter(|stream| !is_attached_picture(stream));
+        // still-image video stream. Exclude it before `best()` — otherwise
+        // FFmpeg may rank cover art first and the post-filter drops it, losing
+        // a real video stream that follows.
+        let video_stream = best_video_stream(&input);
         let audio_stream = input.streams().best(Type::Audio);
 
         let video_result = video_stream.as_ref().map(probe_video);
@@ -135,6 +133,22 @@ fn raw_stream_seconds(raw: i64, time_base_num: i64, time_base_den: i64) -> Optio
 /// rather than real footage.
 fn is_attached_picture(stream: &Stream<'_>) -> bool {
     stream.disposition().contains(Disposition::ATTACHED_PIC)
+}
+
+/// The best video stream for probing, never cover-art thumbnails.
+fn best_video_stream(input: &format::context::Input) -> Option<Stream<'_>> {
+    let global_best = input.streams().best(Type::Video)?;
+    if !is_attached_picture(&global_best) {
+        return Some(global_best);
+    }
+
+    // `av_find_best_stream` ranked cover art first — pick the lowest-indexed
+    // remaining video stream (stable, deterministic; sufficient for probe).
+    input
+        .streams()
+        .filter(|stream| stream.parameters().medium() == Type::Video)
+        .filter(|stream| !is_attached_picture(stream))
+        .min_by_key(ffmpeg_next::Stream::index)
 }
 
 fn probe_video(stream: &Stream<'_>) -> Result<VideoProperties, MediaError> {
