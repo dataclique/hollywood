@@ -804,6 +804,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "hollywood-ffmpeg"
+version = "0.1.0"
+dependencies = [
+ "ffmpeg-next",
+ "hollywood-timeline",
+ "thiserror",
+]
+
+[[package]]
 name = "hollywood-nle"
 version = "0.1.0"
 dependencies = [

@@ -51,6 +51,9 @@ num-traits = "0.2"
 proptest = "1"
 quick-xml = "0.40"
 
+# Media I/O. ffmpeg-next 8.x tracks FFmpeg 8; the dev shell pins the libraries.
+ffmpeg-next = "8"
+
 # Intra-workspace crates.
 hollywood-timeline.path = "crates/timeline"
 
@@ -67,7 +70,7 @@ default-run = "hollywood"
 [dependencies]
 # Media I/O. ffmpeg-next 8.x tracks FFmpeg 8; the dev shell pins the matching
 # FFmpeg libraries so the native link is reproducible.
-ffmpeg-next = "8"
+ffmpeg-next.workspace = true
 apalis-sql.workspace = true
 clap.workspace = true
 serde.workspace = true

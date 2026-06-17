@@ -64,8 +64,8 @@ without correct durations, sample rates, and decoded audio. Proving the FFmpeg
 link and probe path early (already partly de-risked in the foundation) unblocks
 the two analysis crates.
 
-- [ ] `crates/hollywood-ffmpeg`: probe (duration, fps, sample rate, channels)
-      behind a narrow trait
+- [x] `crates/ffmpeg`: probe (duration, fps, sample rate, channels) behind a
+      narrow trait
 - [ ] Decode audio to mono sample buffers for analysis
 - [ ] Fixture media + tests; keep the trait backend-swappable (Symphonia
       fallback)
