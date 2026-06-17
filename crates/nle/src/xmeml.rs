@@ -118,11 +118,15 @@ fn write_track(
                 // trailing or gap-only track still honours the frame-alignment
                 // contract.
                 frames_exact(gap.duration(), rate)?;
-                position += gap.duration();
+                position = position
+                    .checked_add(gap.duration())
+                    .ok_or(NleError::InvalidTimeline(TimelineError::OccupiedOverflow))?;
             }
             TrackItem::Clip(clip) => {
                 let start_frame = frames_exact(position, rate)?;
-                position += clip.duration();
+                position = position
+                    .checked_add(clip.duration())
+                    .ok_or(NleError::InvalidTimeline(TimelineError::OccupiedOverflow))?;
                 let end_frame = frames_exact(position, rate)?;
                 write_clipitem(writer, ids, clip, rate, start_frame, end_frame)?;
             }

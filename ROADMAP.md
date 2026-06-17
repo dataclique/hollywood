@@ -51,8 +51,8 @@ opening natively in _both_ Premiere and Resolve, proven by golden files, before
 attempting transitions or FCPXML.
 
 - [x] `crates/hollywood-nle`: golden-file test harness
-- [x] FCP7 **xmeml** writer — multi-track, hard cuts (primary Premiere+Resolve
-      path)
+- [x] FCP7 **xmeml** writer — multi-track, hard cuts (implemented; golden-file
+      regression harness only — Premiere/Resolve import not yet validated)
 - [ ] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
 - [ ] Audio cross-fade transitions (separate, validated against real imports)
 - [ ] Optional `.otio` export via native `serde_json` against a pinned schema
