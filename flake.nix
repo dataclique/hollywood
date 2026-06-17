@@ -54,7 +54,7 @@
         hooks = {
           # Nix
           nil.enable = true;
-          nixfmt-rfc-style.enable = true;
+          nixfmt.enable = true;
 
           # TOML
           taplo.enable = true;
