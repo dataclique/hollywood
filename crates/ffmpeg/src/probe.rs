@@ -1,11 +1,11 @@
 //! Media probing via FFmpeg, behind a backend-swappable trait.
 
-use std::path::Path;
-
 use ffmpeg_next::codec::context::Context;
 use ffmpeg_next::format;
 use ffmpeg_next::format::stream::{Disposition, Stream};
 use ffmpeg_next::media::Type;
+use std::path::Path;
+
 use hollywood_timeline::{
     AudioProperties, ChannelLayout, FrameRate, MediaAsset, MediaSource, SampleRate, Seconds,
     VideoProperties,
