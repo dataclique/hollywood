@@ -1,0 +1,18 @@
+[package]
+name = "hollywood-gui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Hollywood desktop shell — egui/eframe UI for picking footage, watching progress, and choosing export targets."
+
+[dependencies]
+eframe.workspace = true
+hollywood-ffmpeg.workspace = true
+hollywood-timeline.workspace = true
+rfd.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

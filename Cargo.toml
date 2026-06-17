@@ -51,10 +51,16 @@ num-traits = "0.2"
 proptest = "1"
 quick-xml = "0.40"
 
+# Desktop shell (ADR 0005 — pin exact minor; wgpu is eframe's default renderer).
+eframe = "0.34"
+rfd = "0.17"
+
 # Media I/O. ffmpeg-next 8.x tracks FFmpeg 8; the dev shell pins the libraries.
 ffmpeg-next = "8"
 
 # Intra-workspace crates.
+hollywood-ffmpeg.path = "crates/ffmpeg"
+hollywood-gui.path = "crates/gui"
 hollywood-timeline.path = "crates/timeline"
 
 [package]
@@ -78,6 +84,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+hollywood-gui.workspace = true
 
 [lints]
 workspace = true
