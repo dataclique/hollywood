@@ -94,7 +94,8 @@ developing; run `cargo clippy` and `cargo fmt` before committing.
 **Dependencies.** Add crates with `cargo add <crate>` — never hand-write version
 numbers (they get hallucinated). Shared dependencies live in the
 `[workspace.dependencies]` catalog in the root `Cargo.toml`; crates reference
-them with `<dep>.workspace = true`.
+them with `<dep>.workspace = true` (per the dotted-vs-block guidance under
+[Code Style](#code-style)).
 
 ### Version control
 
@@ -193,13 +194,28 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
 - **No boolean blindness.** Prefer discriminated unions
   (`enum Fade { In, Out }`) over bare `bool`s; when a boolean is unavoidable,
   wrap it in named constructors rather than exposing `set_x(true/false)`.
+- **Model the value, not a `String`.** Every identifier and domain value gets a
+  type that captures its actual structure — a newtype wrapping `String` that
+  encodes nothing is still a bug, and a type alias (`type X = Y`) is not a type
+  at all (the compiler can't tell it apart). Choose the shape by what determines
+  the value:
+  - opaque and randomly generated → wrap a `Ulid`/`Uuid`, not `String`;
+  - composed of N values → a struct with those N fields;
+  - one of N kinds → an enum with N variants (e.g. `MediaSource::File(PathBuf)`,
+    extensible to a URL without touching call sites).
+
+  Put the string conversion on the type itself (`Display`/`FromStr`), defined in
+  exactly one place, so formatting and parsing never spread across call sites as
+  `format!(...)` and ad-hoc parsers.
 - **Newtypes over primitives.** Wrap domain quantities (rational time, frame
   rate, sample rate, track index) in types; don't pass raw `i64`/`f64` where a
   domain type clarifies intent and units.
-- **Package by feature, not by layer.** Each capability is a workspace crate
-  (`hollywood-timeline`, `hollywood-nle`, `hollywood-ffmpeg`, `hollywood-sync`,
-  `hollywood-detect`, `hollywood-pipeline`). Keep domain boundaries clean and
-  dependencies acyclic.
+- **Package by feature, not by layer.** Each capability is a workspace crate.
+  The directory drops the project prefix (`crates/timeline`, `crates/nle`,
+  `crates/ffmpeg`, …); the Cargo **package name** keeps it
+  (`hollywood-timeline`, `hollywood-nle`, …) so it stays unambiguous on
+  crates.io and in dependency lists. Keep domain boundaries clean and the
+  dependency graph acyclic.
 - **Error handling.** Use `thiserror` enums per crate; propagate with `?`. No
   panics in non-test code — model the failure.
 - **Module organization — public API first.** Within a module, order code so the
@@ -209,6 +225,16 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
 - **Comments.** Doc comments (how to use the code) are good. Comments narrating
   what the code does are not — make the code clear through naming and structure
   instead.
+- **Clear but concise — let the formatter decide the threshold.** The governing
+  rule is _clear first, concise second_, judged by how it reads **after the
+  formatter runs**, which differs by language:
+  - **TOML (taplo):** one key → dotted (`dep.workspace = true`); two or more
+    keys → inline table (`dep = { workspace = true, features = [...] }`), which
+    taplo keeps on one line.
+  - **Nix (nixfmt):** prefer the flattened dotted form (`a.b = x;` `a.c = y;`;
+    `services.foo.enable = true`) — nixfmt explodes a multi-attribute `{ … }`
+    onto separate lines, so reach for braces only when the grouping genuinely
+    aids clarity.
 
 ---
 
