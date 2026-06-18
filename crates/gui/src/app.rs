@@ -49,6 +49,8 @@ struct HollywoodApp {
     footage: Vec<FootageEntry>,
     export: ExportSelection,
     progress: f32,
+    /// Accumulated frame time, in seconds, driving the burning loading indicator.
+    anim: f32,
     picker_rx: Option<mpsc::Receiver<PickerResult>>,
     probe_rx: Option<mpsc::Receiver<ProbeBatch>>,
 }
@@ -64,6 +66,7 @@ impl HollywoodApp {
             footage: Vec::new(),
             export: ExportSelection::default_enabled(),
             progress: 0.0,
+            anim: 0.0,
             picker_rx: None,
             probe_rx: None,
         }
@@ -157,11 +160,35 @@ impl HollywoodApp {
                 .iter()
                 .all(|f| !matches!(f.outcome(), ProbeOutcome::Pending))
     }
+
+    /// What the loading indicator should show: an ember sweep while footage is
+    /// probing, the pipeline's progress once it runs, otherwise nothing.
+    fn burn(&self) -> theme::Burn {
+        if self.probe_rx.is_some()
+            || self
+                .footage
+                .iter()
+                .any(|f| matches!(f.outcome(), ProbeOutcome::Pending))
+        {
+            theme::Burn::Indeterminate
+        } else if self.progress > 0.0 {
+            theme::Burn::Fraction(self.progress)
+        } else {
+            theme::Burn::Idle
+        }
+    }
 }
 
 impl eframe::App for HollywoodApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll_background(ctx);
+        if matches!(
+            self.burn(),
+            theme::Burn::Indeterminate | theme::Burn::Fraction(_)
+        ) {
+            self.anim += ctx.input(|i| i.stable_dt);
+            ctx.request_repaint();
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -189,7 +216,7 @@ impl eframe::App for HollywoodApp {
 impl HollywoodApp {
     fn toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
-            theme::logo_mark(ui, 26.0, 7);
+            theme::mark(ui, 30.0, 8);
             ui.add_space(10.0);
             ui.label(
                 egui::RichText::new("Hollywood")
@@ -229,18 +256,15 @@ impl HollywoodApp {
         ui.add_space(20.0);
         theme::overline(ui, "PROGRESS");
         ui.add_space(8.0);
-        let mut bar = egui::ProgressBar::new(self.progress)
-            .desired_height(10.0)
-            .corner_radius(egui::CornerRadius::same(5))
-            .fill(theme::ACCENT);
-        if self.progress > 0.0 {
-            bar = bar.show_percentage();
-        }
-        ui.add(bar);
+        let burn = self.burn();
+        theme::fire_bar(ui, &burn, self.anim);
         ui.add_space(8.0);
-        if self.progress <= 0.0 {
-            ui.label(egui::RichText::new("Waiting for pipeline…").color(theme::TEXT_DIM));
-        }
+        let caption = match burn {
+            theme::Burn::Indeterminate => "Probing footage…".to_owned(),
+            theme::Burn::Fraction(fraction) => format!("{:.0}%", fraction * 100.0),
+            theme::Burn::Idle => "Waiting for pipeline…".to_owned(),
+        };
+        ui.label(egui::RichText::new(caption).color(theme::TEXT_DIM));
     }
 
     fn export_target_row(&mut self, ui: &mut egui::Ui, target: ExportTarget) {
@@ -252,7 +276,7 @@ impl HollywoodApp {
             .corner_radius(egui::CornerRadius::same(8))
             .min_size(egui::vec2(ui.available_width(), 32.0));
         if selected {
-            chip = chip.stroke(egui::Stroke::new(1.0, theme::ACCENT));
+            chip = chip.stroke(egui::Stroke::new(1.0, theme::TEAL));
         }
         let response = ui.add_enabled(available, chip);
         if available && response.clicked() {
@@ -269,7 +293,7 @@ impl HollywoodApp {
             theme::section_header(ui, "Footage");
             if !self.footage.is_empty() {
                 ui.add_space(4.0);
-                theme::pill(ui, &self.footage.len().to_string(), theme::TEXT_DIM);
+                theme::pill(ui, &self.footage.len().to_string(), theme::TEAL);
             }
         });
         ui.add_space(12.0);
@@ -293,7 +317,7 @@ impl HollywoodApp {
         let top = ((ui.available_height() - 210.0) * 0.5).max(24.0);
         ui.add_space(top);
         ui.vertical_centered(|ui| {
-            theme::hero_mark(ui, 84.0);
+            theme::mark(ui, 88.0, 22);
             ui.add_space(18.0);
             ui.label(
                 egui::RichText::new("No footage yet")
