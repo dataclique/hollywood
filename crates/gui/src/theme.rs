@@ -46,8 +46,6 @@ pub const TEXT_FAINT: Color32 = Color32::from_rgb(78, 87, 93);
 // The grade: warm highlights + cool shadows.
 /// Warm accent — the primary action and fire.
 pub const ORANGE: Color32 = Color32::from_rgb(255, 138, 61);
-/// Brighter orange for hover and the sun's core.
-pub const ORANGE_HOVER: Color32 = Color32::from_rgb(255, 170, 104);
 /// Text drawn on top of an [`ORANGE`] fill.
 pub const ON_ORANGE: Color32 = Color32::from_rgb(24, 16, 10);
 /// Cool accent — selection, focus, and information.
@@ -67,9 +65,10 @@ const SHADOW: egui::Shadow = egui::Shadow {
     color: Color32::from_black_alpha(140),
 };
 
-// Logo: sunset over the Hollywood Hills.
-const SKY: Color32 = Color32::from_rgb(22, 36, 43);
-const HILLS: Color32 = Color32::from_rgb(9, 16, 20);
+// Logo: the HOLLYWOOD sign on its hillside at dusk.
+const SKY: Color32 = Color32::from_rgb(20, 31, 38);
+const HILL: Color32 = Color32::from_rgb(67, 58, 47);
+const SIGN: Color32 = Color32::from_rgb(236, 232, 223);
 
 // Fire: the burning loading indicator.
 const FIRE_BASE: Color32 = Color32::from_rgb(150, 28, 18);
@@ -178,11 +177,11 @@ pub fn pill(ui: &mut egui::Ui, label: &str, color: Color32) {
         });
 }
 
-/// The app mark: a sunset dipping behind the Hollywood Hills. `size` is the
+/// The app mark: the HOLLYWOOD sign on its hillside at dusk. `size` is the
 /// side length, `corner` the corner radius in points.
 pub fn mark(ui: &mut egui::Ui, size: f32, corner: u8) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
-    paint_hills(&ui.painter_at(rect), rect, corner);
+    paint_mark(&ui.painter_at(rect), rect, corner);
 }
 
 /// The loading indicator: a burning fuse. Drive `phase` from accumulated frame
@@ -220,19 +219,27 @@ pub fn fire_bar(ui: &mut egui::Ui, burn: &Burn, phase: f32) {
     }
 }
 
-fn paint_hills(painter: &egui::Painter, rect: Rect, corner: u8) {
+fn paint_mark(painter: &egui::Painter, rect: Rect, corner: u8) {
     let w = rect.width();
     let h = rect.height();
+    let left = rect.left();
+    let top = rect.top();
     painter.rect_filled(rect, CornerRadius::same(corner), SKY);
 
-    // The sun, low in the sky — it will dip behind the taller hill.
-    let sun = egui::pos2(w.mul_add(0.60, rect.left()), h.mul_add(0.52, rect.top()));
-    painter.circle_filled(sun, w * 0.17, ORANGE);
-    painter.circle_filled(sun, w * 0.11, ORANGE_HOVER);
+    let horizon = h.mul_add(0.62, top);
 
-    // Ground, with only the bottom corners rounded to match the mark.
-    let horizon = h.mul_add(0.66, rect.top());
-    let ground = Rect::from_min_max(egui::pos2(rect.left(), horizon), rect.max);
+    // A faint golden-hour band along the horizon — dusk, not a literal sun.
+    let glow_above = h * 0.07;
+    let glow_below = h * 0.02;
+    let glow = Rect::from_min_max(
+        egui::pos2(left, horizon - glow_above),
+        egui::pos2(rect.right(), horizon + glow_below),
+    );
+    painter.rect_filled(glow, CornerRadius::ZERO, ORANGE.gamma_multiply(0.20));
+
+    // The hillside: flat ground plus a single gently rounded crest (the cap of
+    // a large circle), so it reads as a hill, not a jagged peak.
+    let ground = Rect::from_min_max(egui::pos2(left, horizon), rect.max);
     painter.rect_filled(
         ground,
         CornerRadius {
@@ -241,23 +248,36 @@ fn paint_hills(painter: &egui::Painter, rect: Rect, corner: u8) {
             sw: corner,
             se: corner,
         },
-        HILLS,
+        HILL,
     );
+    let radius = w * 0.64;
+    let peak = h * 0.20;
+    let center_x = w.mul_add(0.50, left);
+    let center_y = radius + horizon - peak;
+    painter.circle_filled(egui::pos2(center_x, center_y), radius, HILL);
 
-    // Hill humps rising above the horizon.
-    let hump = |cx: f32, peak: f32, half: f32| {
-        egui::Shape::convex_polygon(
-            vec![
-                egui::pos2(rect.left() + cx - half, horizon + 1.0),
-                egui::pos2(rect.left() + cx, horizon - peak),
-                egui::pos2(rect.left() + cx + half, horizon + 1.0),
-            ],
-            HILLS,
-            Stroke::NONE,
-        )
-    };
-    painter.add(hump(w * 0.30, h * 0.30, w * 0.30));
-    painter.add(hump(w * 0.66, h * 0.40, w * 0.34));
+    // The HOLLYWOOD sign: thin white letters standing on the crest, each one
+    // sitting on the curve of the hillside.
+    let bar_w = w * 0.045;
+    let bar_half = bar_w * 0.5;
+    let gap = w * 0.03;
+    let pitch = bar_w + gap;
+    let span = pitch.mul_add(8.0, -gap);
+    let half_span = span * 0.5;
+    let bar_h = h * 0.15;
+    let radius_sq = radius * radius;
+    let mut x = center_x - half_span;
+    // Eight uprights stand in for the HOLLYWOOD letters (matches the 8.0 span).
+    for _ in 0..8 {
+        let dx = x + bar_half - center_x;
+        let surface = center_y - dx.mul_add(-dx, radius_sq).max(0.0).sqrt();
+        let bar = Rect::from_min_max(
+            egui::pos2(x, surface - bar_h),
+            egui::pos2(x + bar_w, surface + glow_below),
+        );
+        painter.rect_filled(bar, CornerRadius::ZERO, SIGN);
+        x += pitch;
+    }
 }
 
 fn paint_fire(painter: &egui::Painter, fill: Rect, phase: f32) {
