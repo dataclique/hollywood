@@ -229,6 +229,18 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
   most important things appear first: public types/traits, then public
   functions/impls, then private helpers. Reviewers should understand the
   interface before the internals.
+- **Minimal visibility.** Only a crate's real public API is `pub`. A library
+  whose sole consumer is the binary (e.g. `hollywood-gui`, reached only via
+  `run`) exposes just that entry point; everything else is `pub(crate)` or
+  private. Over-`pub` misrepresents the crate's API surface, and in a library
+  crate it also hides bugs: `pub` declares external API, so the compiler exempts
+  unused `pub` items from `dead_code` even when nothing outside the crate uses
+  them. `pub(crate)` and private get identical `dead_code` analysis, so default
+  to the narrowest visibility that compiles. Integration tests under `tests/`
+  are the exception: Cargo compiles them as separate crates, so they can only
+  call `pub` items — the API they import is genuinely public and stays `pub`;
+  reach for `#[cfg(test)]` unit tests in `src/` when you need to exercise
+  internals instead of widening visibility.
 - **Comments.** Doc comments (how to use the code) are good. Comments narrating
   what the code does are not — make the code clear through naming and structure
   instead.
