@@ -19,46 +19,46 @@ use eframe::egui::{
 
 // Surfaces — graded blacks with a cool teal cast (shadows pushed teal).
 /// Central canvas behind the footage list.
-pub const BG_APP: Color32 = Color32::from_rgb(10, 13, 14);
+pub(crate) const BG_APP: Color32 = Color32::from_rgb(10, 13, 14);
 /// Toolbar and side-panel chrome.
-pub const BG_PANEL: Color32 = Color32::from_rgb(14, 19, 22);
+pub(crate) const BG_PANEL: Color32 = Color32::from_rgb(14, 19, 22);
 /// Cards, buttons, and inputs at rest.
-pub const BG_CARD: Color32 = Color32::from_rgb(20, 27, 31);
+pub(crate) const BG_CARD: Color32 = Color32::from_rgb(20, 27, 31);
 /// Cards and buttons while hovered.
-pub const BG_CARD_HOVER: Color32 = Color32::from_rgb(27, 36, 42);
+pub(crate) const BG_CARD_HOVER: Color32 = Color32::from_rgb(27, 36, 42);
 /// Sunken wells such as the loading-bar track.
-pub const BG_SUNKEN: Color32 = Color32::from_rgb(6, 9, 10);
+pub(crate) const BG_SUNKEN: Color32 = Color32::from_rgb(6, 9, 10);
 
 /// Hairline borders and separators.
-pub const STROKE_SOFT: Color32 = Color32::from_rgb(28, 36, 42);
+pub(crate) const STROKE_SOFT: Color32 = Color32::from_rgb(28, 36, 42);
 /// Borders on hovered or emphasized surfaces.
-pub const STROKE_STRONG: Color32 = Color32::from_rgb(43, 55, 62);
+pub(crate) const STROKE_STRONG: Color32 = Color32::from_rgb(43, 55, 62);
 
 /// Headings and primary emphasis text.
-pub const TEXT_STRONG: Color32 = Color32::from_rgb(242, 246, 247);
+pub(crate) const TEXT_STRONG: Color32 = Color32::from_rgb(242, 246, 247);
 /// Body text.
-pub const TEXT: Color32 = Color32::from_rgb(191, 203, 208);
+pub(crate) const TEXT: Color32 = Color32::from_rgb(191, 203, 208);
 /// Secondary text.
-pub const TEXT_DIM: Color32 = Color32::from_rgb(124, 139, 146);
+pub(crate) const TEXT_DIM: Color32 = Color32::from_rgb(124, 139, 146);
 /// Faint metadata.
-pub const TEXT_FAINT: Color32 = Color32::from_rgb(78, 87, 93);
+pub(crate) const TEXT_FAINT: Color32 = Color32::from_rgb(78, 87, 93);
 
 // The grade: warm highlights + cool shadows.
 /// Warm accent — the primary action and fire.
-pub const ORANGE: Color32 = Color32::from_rgb(255, 138, 61);
+pub(crate) const ORANGE: Color32 = Color32::from_rgb(255, 138, 61);
 /// Brighter orange for hover and the sun's core.
-pub const ORANGE_HOVER: Color32 = Color32::from_rgb(255, 170, 104);
+pub(crate) const ORANGE_HOVER: Color32 = Color32::from_rgb(255, 170, 104);
 /// Text drawn on top of an [`ORANGE`] fill.
-pub const ON_ORANGE: Color32 = Color32::from_rgb(24, 16, 10);
+pub(crate) const ON_ORANGE: Color32 = Color32::from_rgb(24, 16, 10);
 /// Cool accent — selection, focus, and information.
-pub const TEAL: Color32 = Color32::from_rgb(52, 195, 212);
+pub(crate) const TEAL: Color32 = Color32::from_rgb(52, 195, 212);
 
 /// Status color for a successful probe.
-pub const OK: Color32 = TEAL;
+pub(crate) const OK: Color32 = TEAL;
 /// Status color for an in-flight probe.
-pub const BUSY: Color32 = ORANGE;
+pub(crate) const BUSY: Color32 = ORANGE;
 /// Status color for a failed probe.
-pub const BAD: Color32 = Color32::from_rgb(255, 82, 71);
+pub(crate) const BAD: Color32 = Color32::from_rgb(255, 82, 71);
 
 const SHADOW: egui::Shadow = egui::Shadow {
     offset: [0, 10],
@@ -77,7 +77,7 @@ const FIRE_MID: Color32 = Color32::from_rgb(255, 106, 30);
 const FIRE_TIP: Color32 = Color32::from_rgb(255, 216, 110);
 
 /// What the loading indicator should show.
-pub enum Burn {
+pub(crate) enum Burn {
     /// Nothing is running.
     Idle,
     /// Work of unknown duration (e.g. probing footage).
@@ -91,7 +91,7 @@ pub enum Burn {
 /// Pins egui to its dark theme and applies the palette to both the dark and
 /// light styles, so following the OS appearance can never leave the UI
 /// half-themed.
-pub fn install(ctx: &egui::Context) {
+pub(crate) fn install(ctx: &egui::Context) {
     ctx.set_theme(egui::ThemePreference::Dark);
     ctx.all_styles_mut(|style| {
         style.text_styles = text_styles();
@@ -102,28 +102,28 @@ pub fn install(ctx: &egui::Context) {
 }
 
 /// Frame for the top toolbar.
-pub fn toolbar_frame() -> egui::Frame {
+pub(crate) fn toolbar_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(BG_PANEL)
         .inner_margin(Margin::symmetric(20, 14))
 }
 
 /// Frame for the right-hand export panel.
-pub fn side_frame() -> egui::Frame {
+pub(crate) fn side_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(BG_PANEL)
         .inner_margin(Margin::symmetric(20, 18))
 }
 
 /// Frame for the central footage area.
-pub fn central_frame() -> egui::Frame {
+pub(crate) fn central_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(BG_APP)
         .inner_margin(Margin::symmetric(24, 18))
 }
 
 /// Frame for a single footage card.
-pub fn card_frame() -> egui::Frame {
+pub(crate) fn card_frame() -> egui::Frame {
     egui::Frame::new()
         .fill(BG_CARD)
         .stroke(Stroke::new(1.0, STROKE_SOFT))
@@ -132,7 +132,7 @@ pub fn card_frame() -> egui::Frame {
 }
 
 /// The warm call-to-action button.
-pub fn primary_button(label: &str) -> egui::Button<'static> {
+pub(crate) fn primary_button(label: &str) -> egui::Button<'static> {
     egui::Button::new(RichText::new(label).color(ON_ORANGE))
         .fill(ORANGE)
         .corner_radius(CornerRadius::same(9))
@@ -140,14 +140,14 @@ pub fn primary_button(label: &str) -> egui::Button<'static> {
 }
 
 /// A neutral, framed secondary button matching the primary button's size.
-pub fn secondary_button(label: &str) -> egui::Button<'static> {
+pub(crate) fn secondary_button(label: &str) -> egui::Button<'static> {
     egui::Button::new(label)
         .corner_radius(CornerRadius::same(9))
         .min_size(egui::vec2(0.0, 32.0))
 }
 
 /// A large section heading.
-pub fn section_header(ui: &mut egui::Ui, text: &str) {
+pub(crate) fn section_header(ui: &mut egui::Ui, text: &str) {
     ui.label(
         RichText::new(text)
             .size(18.0)
@@ -157,7 +157,7 @@ pub fn section_header(ui: &mut egui::Ui, text: &str) {
 }
 
 /// A small uppercase label that introduces a group of controls.
-pub fn overline(ui: &mut egui::Ui, text: &str) {
+pub(crate) fn overline(ui: &mut egui::Ui, text: &str) {
     ui.label(
         RichText::new(text)
             .size(10.5)
@@ -167,7 +167,7 @@ pub fn overline(ui: &mut egui::Ui, text: &str) {
 }
 
 /// A small rounded status badge tinted with `color`.
-pub fn pill(ui: &mut egui::Ui, label: &str, color: Color32) {
+pub(crate) fn pill(ui: &mut egui::Ui, label: &str, color: Color32) {
     egui::Frame::new()
         .fill(color.gamma_multiply(0.16))
         .stroke(Stroke::new(1.0, color.gamma_multiply(0.45)))
@@ -180,14 +180,14 @@ pub fn pill(ui: &mut egui::Ui, label: &str, color: Color32) {
 
 /// The app mark: a sunset dipping behind the Hollywood Hills. `size` is the
 /// side length, `corner` the corner radius in points.
-pub fn mark(ui: &mut egui::Ui, size: f32, corner: u8) {
+pub(crate) fn mark(ui: &mut egui::Ui, size: f32, corner: u8) {
     let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
     paint_hills(&ui.painter_at(rect), rect, corner);
 }
 
 /// The loading indicator: a burning fuse. Drive `phase` from accumulated frame
 /// time so the tip flickers and the indeterminate ember sweeps.
-pub fn fire_bar(ui: &mut egui::Ui, burn: &Burn, phase: f32) {
+pub(crate) fn fire_bar(ui: &mut egui::Ui, burn: &Burn, phase: f32) {
     let (rect, _) =
         ui.allocate_exact_size(egui::vec2(ui.available_width(), 12.0), egui::Sense::hover());
     let painter = ui.painter_at(rect);

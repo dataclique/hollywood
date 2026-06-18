@@ -8,7 +8,7 @@ use std::sync::mpsc;
 
 /// Result of a footage file-picker dialog.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum PickerResult {
+pub(crate) enum PickerResult {
     /// The user chose one or more files.
     Files(Vec<PathBuf>),
     /// The dialog closed without a selection.
@@ -17,7 +17,7 @@ pub enum PickerResult {
 
 /// Start a multi-select media file dialog. Poll [`mpsc::Receiver::try_recv`] from
 /// the UI thread.
-pub fn open_footage_picker() -> mpsc::Receiver<PickerResult> {
+pub(crate) fn open_footage_picker() -> mpsc::Receiver<PickerResult> {
     let (tx, rx) = mpsc::channel();
     std::thread::spawn(move || {
         let paths = rfd::FileDialog::new()

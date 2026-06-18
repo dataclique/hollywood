@@ -2,7 +2,7 @@
 
 /// An interchange format Hollywood can emit once the pipeline is wired.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ExportTarget {
+pub(crate) enum ExportTarget {
     /// FCP7 `xmeml` — Premiere Pro and DaVinci Resolve.
     Xmeml,
     /// FCPXML — Final Cut Pro and Resolve (not implemented yet).
@@ -11,7 +11,7 @@ pub enum ExportTarget {
 
 impl ExportTarget {
     /// Short label for the checkbox.
-    pub fn label(self) -> &'static str {
+    pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Xmeml => "Premiere / Resolve (FCP7 xmeml)",
             Self::Fcpxml => "Final Cut / Resolve (FCPXML)",
@@ -19,37 +19,37 @@ impl ExportTarget {
     }
 
     /// Whether the exporter exists today.
-    pub fn is_available(self) -> bool {
+    pub(crate) fn is_available(self) -> bool {
         matches!(self, Self::Xmeml)
     }
 
     /// Every target the UI offers.
-    pub fn all() -> [Self; 2] {
+    pub(crate) fn all() -> [Self; 2] {
         [Self::Xmeml, Self::Fcpxml]
     }
 }
 
 /// Which export formats are enabled for the next run.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ExportSelection {
+pub(crate) struct ExportSelection {
     enabled: Vec<ExportTarget>,
 }
 
 impl ExportSelection {
     /// Xmeml only — the only exporter implemented so far.
-    pub fn default_enabled() -> Self {
+    pub(crate) fn default_enabled() -> Self {
         Self {
             enabled: vec![ExportTarget::Xmeml],
         }
     }
 
     /// Whether `target` is checked.
-    pub fn contains(&self, target: ExportTarget) -> bool {
+    pub(crate) fn contains(&self, target: ExportTarget) -> bool {
         self.enabled.contains(&target)
     }
 
     /// Toggle a target on or off. Unavailable targets stay off.
-    pub fn set(&mut self, target: ExportTarget, on: bool) {
+    pub(crate) fn set(&mut self, target: ExportTarget, on: bool) {
         if on && target.is_available() {
             if !self.enabled.contains(&target) {
                 self.enabled.push(target);
@@ -60,7 +60,7 @@ impl ExportSelection {
     }
 
     /// Whether any implemented export format is selected.
-    pub fn has_implemented_target(&self) -> bool {
+    pub(crate) fn has_implemented_target(&self) -> bool {
         self.enabled.iter().any(|t| t.is_available())
     }
 }

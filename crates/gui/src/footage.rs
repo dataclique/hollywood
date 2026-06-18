@@ -7,7 +7,7 @@ use hollywood_timeline::MediaSource;
 
 /// Probe outcome for one piece of footage.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ProbeOutcome {
+pub(crate) enum ProbeOutcome {
     /// Probe is running on a worker thread.
     Pending,
     /// Properties read successfully.
@@ -18,7 +18,7 @@ pub enum ProbeOutcome {
 
 impl ProbeOutcome {
     /// One-line summary for the footage list.
-    pub fn summary(&self) -> String {
+    pub(crate) fn summary(&self) -> String {
         match self {
             Self::Pending => "probing…".to_owned(),
             Self::Ready(media) => {
@@ -43,14 +43,14 @@ impl ProbeOutcome {
 
 /// One user-selected source file and its probe state.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct FootageEntry {
+pub(crate) struct FootageEntry {
     source: MediaSource,
     outcome: ProbeOutcome,
 }
 
 impl FootageEntry {
     /// Footage waiting to be probed.
-    pub fn pending(source: MediaSource) -> Self {
+    pub(crate) fn pending(source: MediaSource) -> Self {
         Self {
             source,
             outcome: ProbeOutcome::Pending,
@@ -58,19 +58,19 @@ impl FootageEntry {
     }
 
     /// Footage with a finished probe.
-    pub fn probed(source: MediaSource, outcome: ProbeOutcome) -> Self {
+    pub(crate) fn probed(source: MediaSource, outcome: ProbeOutcome) -> Self {
         Self { source, outcome }
     }
 
-    pub fn source(&self) -> &MediaSource {
+    pub(crate) fn source(&self) -> &MediaSource {
         &self.source
     }
 
-    pub fn outcome(&self) -> &ProbeOutcome {
+    pub(crate) fn outcome(&self) -> &ProbeOutcome {
         &self.outcome
     }
 
-    pub fn label(&self) -> String {
+    pub(crate) fn label(&self) -> String {
         self.source
             .file_name()
             .map_or_else(|| self.source.to_string(), str::to_owned)
