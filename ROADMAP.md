@@ -54,7 +54,8 @@ attempting transitions or FCPXML.
 - [x] FCP7 **xmeml** writer — multi-track, hard cuts (implemented; golden-file
       regression harness only — Premiere/Resolve import not yet validated)
 - [ ] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
-- [ ] Audio cross-fade transitions (separate, validated against real imports)
+- [ ] Audio cross-fade transitions (separate, validated against real imports) —
+      [#31](https://github.com/data-cartel/hollywood/issues/31)
 - [ ] Optional `.otio` export via native `serde_json` against a pinned schema
 
 ## Media I/O
@@ -102,6 +103,38 @@ The single deliverable a user touches.
       targets
 - [ ] CLI surface over the same pipeline for batch/headless use
 - [ ] Packaging/notarization per OS with FFmpeg LGPL notices
+
+## Audio post-processing
+
+**Goal:** make the rough cut comfortable to listen to without manual
+gain-riding. Corrective loudness, EQ, dynamics, and ducking so the editor
+inherits a level, balanced mix instead of raw per-clip levels — the audio
+counterpart to trimming dead air. Rendered to stems rather than fragile
+NLE-native filters ([ADR 0006](./adrs/0006-audio-post-processing-stems.md),
+[SPEC §5.8](./SPEC.md)). Depends on decoded audio and the assembled timeline;
+**post-MVP**, lower priority than the core detect → sync → export pipeline.
+
+Tracked in [#32](https://github.com/data-cartel/hollywood/issues/32) —
+sub-issues #19 (IR vocabulary), #20 (R128 loudness + normalize), #21 (auto-EQ),
+#22 (dynamics), #23 (sidechain ducking), #24 (pipeline `process`/stems stage).
+Audio cross-fade export is
+[#31](https://github.com/data-cartel/hollywood/issues/31), under NLE export
+above.
+
+## Auto-framing & motion
+
+**Goal:** add the camera moves an editor would otherwise keyframe by hand — zoom
+onto the part of the frame that matters, and a slow Ken Burns drift across long,
+static shots — so a flat assembly already has life. Emitted as native keyframed
+transforms, never baked video
+([ADR 0007](./adrs/0007-auto-framing-native-transforms.md),
+[SPEC §5.9](./SPEC.md)). Needs a new video-frame decode capability and
+keyframed-transform export (higher-risk, like cross-fades); **post-MVP**.
+
+Tracked in [#33](https://github.com/data-cartel/hollywood/issues/33) —
+sub-issues #25 (video frame decode), #26 (IR transform/keyframes), #27 (NLE
+transform export), #28 (activity map), #29 (zoom planning), #30 (pipeline
+`reframe` stage).
 
 ## Not epic
 

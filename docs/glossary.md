@@ -34,6 +34,15 @@ when new concepts appear (see [AGENTS.md](../AGENTS.md)).
   feature.
 - **Cross-fade** — an overlap where one clip's audio fades out as the next fades
   in. Notoriously fragile across NLE formats.
+- **Audio-effect chain** — an optional, ordered set of corrective audio effects
+  (normalize / EQ / compress / limit / sidechain-duck) attached to a clip or
+  track in the IR; realized by `hollywood-audio` (see
+  [ADR 0006](../adrs/0006-audio-post-processing-stems.md)).
+- **Transform** — a video clip's crop / scale / position; **static or
+  keyframed** over time. How Hollywood expresses auto-framing in the IR and
+  export (see [ADR 0007](../adrs/0007-auto-framing-native-transforms.md)).
+- **Keyframe** — a (time, value) control point; the NLE interpolates between
+  keyframes to animate a transform (or audio level) over a clip.
 
 ## NLE interchange
 
@@ -76,6 +85,45 @@ when new concepts appear (see [AGENTS.md](../AGENTS.md)).
 - **Frame rate / sample rate / channel layout** — video frames per second, audio
   samples per second, and the arrangement of audio channels (mono/stereo/…).
   Core media-asset properties that must survive into the export.
+
+## Audio processing
+
+Post-cut conditioning of the assembled audio (crate `hollywood-audio`, §5.8).
+All **corrective**, rendered to stems
+([ADR 0006](../adrs/0006-audio-post-processing-stems.md)).
+
+- **LUFS** — Loudness Units relative to Full Scale: the perceptual loudness unit
+  Hollywood normalizes toward. **Integrated LUFS** is the loudness over a whole
+  clip/track.
+- **EBU R128 / ITU-R BS.1770** — the standard loudness-measurement algorithm
+  behind LUFS, measured via the `ebur128` crate.
+- **True peak** — the real inter-sample peak of a signal (above sample peaks);
+  the ceiling a limiter must not exceed to avoid downstream clipping.
+- **Normalization** — applying a gain so a clip/track hits a target integrated
+  LUFS.
+- **Parametric EQ** — frequency-selective gain (per-band center / width / gain).
+  Hollywood derives a **corrective** EQ from a clip's average spectrum.
+- **Compressor / limiter** — dynamics processors that reduce loud peaks (a
+  limiter being a hard, fast compressor) to control dynamic range and hit a
+  loudness target under a true-peak ceiling.
+- **Sidechain ducking** — automatically lowering one track (music/background)
+  driven by the level of another (the speech track) — the "duck music under
+  talking" effect.
+- **Stem** — a rendered audio file with processing baked in, referenced by the
+  timeline as an ordinary clip (so no fragile NLE-native filters cross over).
+
+## Framing & motion
+
+Camera-style motion added after assembly (crate `hollywood-reframe`, §5.9),
+exported as native keyframed transforms
+([ADR 0007](../adrs/0007-auto-framing-native-transforms.md)).
+
+- **Activity map** — a per-region measure of how much a clip's frame changes
+  over its duration (inter-frame difference); drives where to crop.
+- **Content-aware zoom** — choosing a tighter crop onto the active region of the
+  frame, from the activity map.
+- **Ken Burns** — a slow, steady zoom/pan across an otherwise static shot; here,
+  auto-applied to long, low-activity clips as a keyframed transform.
 
 ## Build & tooling
 
