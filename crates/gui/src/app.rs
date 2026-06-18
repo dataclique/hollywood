@@ -370,3 +370,109 @@ fn outcome_status(outcome: &ProbeOutcome) -> (&'static str, egui::Color32) {
         ProbeOutcome::Failed(_) => ("Failed", theme::BAD),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use hollywood_ffmpeg::ProbedMedia;
+    use hollywood_timeline::{AudioProperties, ChannelLayout, SampleRate, Seconds};
+
+    use super::*;
+
+    fn ready_entry() -> FootageEntry {
+        FootageEntry::probed(
+            MediaSource::file("a.wav"),
+            ProbeOutcome::Ready(ProbedMedia {
+                duration: Seconds::from_secs(3),
+                video: None,
+                audio: Some(AudioProperties {
+                    sample_rate: SampleRate::new(48_000).unwrap(),
+                    channels: ChannelLayout::Mono,
+                }),
+            }),
+        )
+    }
+
+    fn pending_entry() -> FootageEntry {
+        FootageEntry::pending(MediaSource::file("a.wav"))
+    }
+
+    fn failed_entry() -> FootageEntry {
+        FootageEntry::probed(
+            MediaSource::file("a.wav"),
+            ProbeOutcome::Failed("boom".to_owned()),
+        )
+    }
+
+    #[test]
+    fn cannot_process_without_footage() {
+        assert!(!HollywoodApp::new().can_process());
+    }
+
+    #[test]
+    fn cannot_process_while_a_probe_is_pending() {
+        let mut app = HollywoodApp::new();
+        app.footage.push(ready_entry());
+        app.footage.push(pending_entry());
+        assert!(!app.can_process());
+    }
+
+    #[test]
+    fn cannot_process_without_an_implemented_target() {
+        let mut app = HollywoodApp::new();
+        app.footage.push(ready_entry());
+        app.export.set(ExportTarget::Xmeml, false);
+        assert!(!app.can_process());
+    }
+
+    #[test]
+    fn can_process_when_ready_with_a_target() {
+        let mut app = HollywoodApp::new();
+        app.footage.push(ready_entry());
+        assert!(app.can_process());
+    }
+
+    #[test]
+    fn a_failed_probe_does_not_gate_processing() {
+        // can_process only waits for *pending* probes; a file that failed to
+        // probe still allows the run. Flagged for review — we may want to
+        // require every entry to be Ready instead.
+        let mut app = HollywoodApp::new();
+        app.footage.push(failed_entry());
+        assert!(app.can_process());
+    }
+
+    #[test]
+    fn burn_is_idle_when_nothing_runs() {
+        assert!(matches!(HollywoodApp::new().burn(), theme::Burn::Idle));
+    }
+
+    #[test]
+    fn burn_is_indeterminate_while_probing() {
+        let mut app = HollywoodApp::new();
+        app.footage.push(pending_entry());
+        assert!(matches!(app.burn(), theme::Burn::Indeterminate));
+    }
+
+    #[test]
+    fn burn_tracks_pipeline_progress() {
+        let mut app = HollywoodApp::new();
+        app.progress = 0.5;
+        assert!(matches!(app.burn(), theme::Burn::Fraction(f) if (f - 0.5).abs() < f32::EPSILON));
+    }
+
+    #[test]
+    fn status_label_and_color_match_outcome() {
+        assert_eq!(
+            outcome_status(&ProbeOutcome::Pending),
+            ("Probing", theme::BUSY)
+        );
+        assert_eq!(
+            outcome_status(ready_entry().outcome()),
+            ("Ready", theme::OK)
+        );
+        assert_eq!(
+            outcome_status(&ProbeOutcome::Failed("e".to_owned())),
+            ("Failed", theme::BAD)
+        );
+    }
+}
