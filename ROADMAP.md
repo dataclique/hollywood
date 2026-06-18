@@ -98,8 +98,9 @@ app and CLI drive the same code. Depends on everything above.
 **Goal:** make it usable — pick footage, watch progress, choose export targets.
 The single deliverable a user touches.
 
-- [ ] `egui`/`eframe` (wgpu) shell: file pickers (`rfd` async), progress, export
-      targets
+- [x] `egui`/`eframe` (wgpu) shell: file pickers (`rfd` on a worker thread),
+      footage list with probe summaries, export target checkboxes, stub progress
+      — _in progress_
 - [ ] CLI surface over the same pipeline for batch/headless use
 - [ ] Packaging/notarization per OS with FFmpeg LGPL notices
 
