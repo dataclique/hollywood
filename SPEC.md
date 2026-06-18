@@ -44,6 +44,9 @@ batch/headless use, both built from one Rust workspace.
 - Not a transcription/subtitle product (though VAD output could feed one later).
 - Not a cloud/multi-user service.
 - Not an **AAF** producer — see §5.4.
+- Not a **video renderer**: auto-framing emits NLE-native keyframed moves, not
+  baked pixels (§5.9, ADR 0007). The one rendering exception is corrective
+  **audio** stems (§5.8, ADR 0006).
 
 ## 3. Architecture
 
@@ -79,15 +82,20 @@ boundaries stay clean and the dependency graph stays acyclic.
 - **`hollywood-detect`** — silence / non-speech detection (§5.2).
 - **`hollywood-sync`** — cross-correlation audio alignment (§5.3).
 - **`hollywood-nle`** — serializes the IR to NLE formats (§5.4).
+- **`hollywood-audio`** — corrective audio post-processing rendered to stems
+  (§5.8).
+- **`hollywood-reframe`** — content-aware zoom and Ken Burns motion as keyframed
+  transforms (§5.9).
 - **`hollywood-pipeline`** — orchestrates the stages as jobs (§5.6).
 - **`hollywood`** — the desktop app + CLI (§5.7).
 
 ### Data flow
 
 `probe` (read media metadata) → `detect` (find keep/cut regions) → `sync` (align
-multi-source audio) → `assemble` (build the timeline IR) → `export` (serialize
-to NLE XML). Each stage consumes and produces well-typed values; the IR is the
-hand-off currency between `assemble` and `export`.
+multi-source audio) → `assemble` (build the timeline IR) → optional `reframe`
+(add keyframed zoom, §5.9) and `process` (render corrective audio stems, §5.8) →
+`export` (serialize to NLE XML). Each stage consumes and produces well-typed
+values; the IR is the hand-off currency between `assemble` and `export`.
 
 ## 4. The timeline IR
 
@@ -107,6 +115,11 @@ Core concepts (modeled as Rust types in `hollywood-timeline`):
   sample rate, channel layout). Clips relink to assets by stable identity.
 - **Transition** — between adjacent clips; initially only audio **cross-fades**
   and hard cuts (§5.4 explains why transitions are a staged risk).
+- **Audio-effect chain** — an optional, ordered chain of corrective audio
+  effects (normalize / EQ / compress / limit / sidechain-duck) attached to a
+  clip or track, realized by `hollywood-audio` (§5.8).
+- **Transform** — a video clip's crop / scale / position, **static or
+  keyframed** over time, used for auto-framing (§5.9).
 
 Design borrows OTIO's _data model_ as a proven pattern — Timeline/Stack/Track/
 Clip/Gap + RationalTime/TimeRange — without taking OTIO as a dependency (§5.4).
@@ -222,6 +235,52 @@ jobs. Caveats baked into the design:
   the egui event loop).
 - The async runtime runs _alongside_ the GUI event loop, never blocking it.
 - The CLI (clap) exposes the same pipeline for batch/headless/CI use.
+
+### 5.8 Audio post-processing (`hollywood-audio`)
+
+After assembly, an optional stage conditions the cut so the rough assembly is
+comfortable to listen to without manual gain-riding. All processing is
+**corrective**, not creative; the editor refines further in the NLE. The IR
+carries an **audio-effect chain** per clip and per track (vocabulary in
+`hollywood-timeline`); `hollywood-audio` realizes it on decoded sample buffers:
+
+- **Loudness normalization** — measure integrated loudness (**EBU R128** / ITU-R
+  BS.1770, via `ebur128`) per clip and per track, apply gain toward a target
+  **LUFS**.
+- **Auto-EQ** — derive a corrective parametric EQ from the average spectrum of a
+  clip (or a section, or a track), FFT via `rustfft`/`realfft`, to tame
+  resonances and tilt.
+- **Dynamics** — a compressor and brick-wall limiter per audio track to hit a
+  target integrated LUFS without exceeding a **true-peak** ceiling.
+- **Sidechain ducking** — duck music/background tracks by the envelope of the
+  main (speech) track when it crosses a threshold.
+
+**Rendered stems, not NLE-native filters (ADR 0006).** NLE audio-filter
+interchange is even less reliable than cross-fades, so the stage renders the
+chain to new **audio stem** files and the export references those; originals
+stay relinkable and the stage is opt-in. Rendering corrective audio is the only
+exception to "Hollywood assembles, the NLE finishes" (§2) — never video.
+
+### 5.9 Auto-framing & motion (`hollywood-reframe`)
+
+Once clips are assembled into one scene, an optional stage adds camera-style
+motion the editor would otherwise keyframe by hand:
+
+- **Content-aware zoom** — build an inter-frame **activity map** over a clip and
+  crop tighter onto the region that actually changes.
+- **Ken Burns auto-zoom** — when a clip exceeds a duration threshold and scene
+  activity is low, generate a slow keyframed zoom in/out across it instead of a
+  static crop.
+
+This needs **decoded video frames** (downscaled) — a new capability on the
+`hollywood-ffmpeg` trait (§5.5) beyond audio decode.
+
+**NLE-native keyframed transforms, not baked pixels (ADR 0007).** Zoom is a
+**transform/crop with keyframes** in the IR, exported as native motion (FCPXML
+`adjust-transform`/`adjust-crop`, FCP7 xmeml basic-motion keyframes) so the
+editor can tweak or delete the move and Hollywood stays a non-renderer.
+Transform interchange varies by NLE, so it is golden-file tested and validated
+against real imports, with a static-transform fallback.
 
 ## 6. Licensing and distribution
 
