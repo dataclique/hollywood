@@ -11,6 +11,16 @@ use tracing::warn;
 use crate::export::{ExportSelection, ExportTarget};
 use crate::footage::{FootageEntry, ProbeOutcome};
 use crate::picker::{PickerResult, open_footage_picker};
+use crate::theme;
+
+/// Initial window size, in logical points: room for the footage list plus the
+/// export side panel. The window is freely resizable; this is only the opening
+/// size.
+const DEFAULT_WINDOW_SIZE: [f32; 2] = [1100.0, 720.0];
+
+/// Smallest the window may shrink to before the toolbar actions and the export
+/// panel start to crowd.
+const MIN_WINDOW_SIZE: [f32; 2] = [720.0, 480.0];
 
 /// Launch the Hollywood desktop shell.
 ///
@@ -19,14 +29,19 @@ use crate::picker::{PickerResult, open_footage_picker};
 /// Returns [`eframe::Error`] if the windowing backend fails to start.
 pub fn run() -> eframe::Result<()> {
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1100.0, 720.0]),
+        viewport: egui::ViewportBuilder::default()
+            .with_inner_size(DEFAULT_WINDOW_SIZE)
+            .with_min_inner_size(MIN_WINDOW_SIZE),
         ..Default::default()
     };
 
     eframe::run_native(
         "Hollywood",
         options,
-        Box::new(|_cc| Ok(Box::new(HollywoodApp::new()))),
+        Box::new(|cc| {
+            theme::install(&cc.egui_ctx);
+            Ok(Box::new(HollywoodApp::new()))
+        }),
     )
 }
 
@@ -150,83 +165,184 @@ impl eframe::App for HollywoodApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-        egui::Panel::top("toolbar").show_inside(ui, |ui| {
-            ui.horizontal(|ui| {
-                ui.heading("Hollywood");
-                ui.separator();
-                let picking = self.picker_rx.is_some();
-                let probing = self.probe_rx.is_some();
-                if ui
-                    .add_enabled(!picking && !probing, egui::Button::new("Add footage"))
-                    .clicked()
-                {
-                    self.begin_pick_footage();
-                }
-                ui.separator();
-                let process = ui.add_enabled(
-                    self.can_process(),
-                    egui::Button::new("Process (coming soon)"),
-                );
-                if process.clicked() {
-                    // Pipeline orchestration lands in hollywood-pipeline.
-                }
-            });
-        });
+        egui::Panel::top("toolbar")
+            .resizable(false)
+            .frame(theme::toolbar_frame())
+            .show_inside(ui, |ui| self.toolbar(ui));
 
         egui::Panel::right("export")
             .resizable(true)
-            .show_inside(ui, |ui| {
-                ui.heading("Export");
-                ui.separator();
-                for target in ExportTarget::all() {
-                    let mut on = self.export.contains(target);
-                    let response = ui.add_enabled(
-                        target.is_available(),
-                        egui::Checkbox::new(&mut on, target.label()),
-                    );
-                    if target.is_available() {
-                        self.export.set(target, on);
-                    } else if response.clicked() {
-                        ui.label("not implemented yet");
-                    }
-                }
-                ui.separator();
-                ui.label("Progress");
-                ui.add(egui::ProgressBar::new(self.progress).show_percentage());
-                if self.progress == 0.0 {
-                    ui.label("Waiting for pipeline…");
-                }
-            });
+            .default_size(300.0)
+            .frame(theme::side_frame())
+            .show_inside(ui, |ui| self.export_panel(ui));
 
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            ui.heading("Footage");
-            ui.separator();
+        egui::CentralPanel::default()
+            .frame(theme::central_frame())
+            .show_inside(ui, |ui| self.footage_panel(ui));
+    }
 
-            if self.footage.is_empty() {
-                ui.vertical_centered(|ui| {
-                    ui.add_space(80.0);
-                    ui.label("Add one or more video or audio files to get started.");
-                    if ui.button("Add footage").clicked() {
+    fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
+        theme::BG_APP.to_normalized_gamma_f32()
+    }
+}
+
+impl HollywoodApp {
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            theme::logo_mark(ui, 26.0, 7);
+            ui.add_space(10.0);
+            ui.label(
+                egui::RichText::new("Hollywood")
+                    .size(22.0)
+                    .color(theme::TEXT_STRONG)
+                    .extra_letter_spacing(0.5),
+            );
+
+            let busy = self.picker_rx.is_some() || self.probe_rx.is_some();
+            let ready = self.can_process();
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_enabled_ui(ready, |ui| {
+                    // Pipeline orchestration lands in hollywood-pipeline.
+                    ui.add(theme::primary_button("Process"))
+                        .on_hover_text("Pipeline coming soon");
+                });
+                ui.add_space(8.0);
+                ui.add_enabled_ui(!busy, |ui| {
+                    if ui.add(theme::secondary_button("Add footage")).clicked() {
                         self.begin_pick_footage();
                     }
                 });
-                return;
-            }
-
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                for entry in &self.footage {
-                    ui.group(|ui| {
-                        ui.label(egui::RichText::new(entry.label()).strong());
-                        ui.label(entry.outcome().summary());
-                        ui.label(
-                            egui::RichText::new(entry.source().to_string())
-                                .small()
-                                .weak(),
-                        );
-                    });
-                    ui.add_space(4.0);
-                }
             });
         });
+    }
+
+    fn export_panel(&mut self, ui: &mut egui::Ui) {
+        theme::section_header(ui, "Export");
+        ui.add_space(14.0);
+
+        theme::overline(ui, "FORMATS");
+        ui.add_space(8.0);
+        for target in ExportTarget::all() {
+            self.export_target_row(ui, target);
+        }
+
+        ui.add_space(20.0);
+        theme::overline(ui, "PROGRESS");
+        ui.add_space(8.0);
+        let mut bar = egui::ProgressBar::new(self.progress)
+            .desired_height(10.0)
+            .corner_radius(egui::CornerRadius::same(5))
+            .fill(theme::ACCENT);
+        if self.progress > 0.0 {
+            bar = bar.show_percentage();
+        }
+        ui.add(bar);
+        ui.add_space(8.0);
+        if self.progress <= 0.0 {
+            ui.label(egui::RichText::new("Waiting for pipeline…").color(theme::TEXT_DIM));
+        }
+    }
+
+    fn export_target_row(&mut self, ui: &mut egui::Ui, target: ExportTarget) {
+        let selected = self.export.contains(target);
+        let available = target.is_available();
+        let mut chip = egui::Button::new(target.label())
+            .selected(selected)
+            .wrap()
+            .corner_radius(egui::CornerRadius::same(8))
+            .min_size(egui::vec2(ui.available_width(), 32.0));
+        if selected {
+            chip = chip.stroke(egui::Stroke::new(1.0, theme::ACCENT));
+        }
+        let response = ui.add_enabled(available, chip);
+        if available && response.clicked() {
+            self.export.set(target, !selected);
+        }
+        if !available {
+            response.on_disabled_hover_text("Not implemented yet");
+        }
+        ui.add_space(6.0);
+    }
+
+    fn footage_panel(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            theme::section_header(ui, "Footage");
+            if !self.footage.is_empty() {
+                ui.add_space(4.0);
+                theme::pill(ui, &self.footage.len().to_string(), theme::TEXT_DIM);
+            }
+        });
+        ui.add_space(12.0);
+
+        if self.footage.is_empty() {
+            self.empty_state(ui);
+            return;
+        }
+
+        egui::ScrollArea::vertical()
+            .auto_shrink(egui::Vec2b::new(false, false))
+            .show(ui, |ui| {
+                for entry in &self.footage {
+                    Self::footage_card(ui, entry);
+                }
+            });
+    }
+
+    fn empty_state(&mut self, ui: &mut egui::Ui) {
+        // Center the hero block vertically in the remaining well (~210px tall).
+        let top = ((ui.available_height() - 210.0) * 0.5).max(24.0);
+        ui.add_space(top);
+        ui.vertical_centered(|ui| {
+            theme::hero_mark(ui, 84.0);
+            ui.add_space(18.0);
+            ui.label(
+                egui::RichText::new("No footage yet")
+                    .size(20.0)
+                    .color(theme::TEXT_STRONG),
+            );
+            ui.add_space(6.0);
+            ui.label(
+                egui::RichText::new("Add video or audio files to start a rough cut.")
+                    .color(theme::TEXT_DIM),
+            );
+            ui.add_space(20.0);
+            if ui.add(theme::primary_button("Add footage")).clicked() {
+                self.begin_pick_footage();
+            }
+        });
+    }
+
+    fn footage_card(ui: &mut egui::Ui, entry: &FootageEntry) {
+        theme::card_frame().show(ui, |ui| {
+            let (status, color) = outcome_status(entry.outcome());
+            // Pin the status pill to the top-right, then let the text column
+            // fill (and wrap within) the remaining width.
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Min), |ui| {
+                theme::pill(ui, status, color);
+                ui.vertical(|ui| {
+                    ui.label(
+                        egui::RichText::new(entry.label())
+                            .size(15.0)
+                            .color(theme::TEXT_STRONG),
+                    );
+                    ui.add_space(3.0);
+                    ui.label(egui::RichText::new(entry.outcome().summary()).color(theme::TEXT_DIM));
+                    ui.add_space(2.0);
+                    ui.label(
+                        egui::RichText::new(entry.source().to_string())
+                            .small()
+                            .color(theme::TEXT_FAINT),
+                    );
+                });
+            });
+        });
+    }
+}
+
+fn outcome_status(outcome: &ProbeOutcome) -> (&'static str, egui::Color32) {
+    match outcome {
+        ProbeOutcome::Pending => ("Probing", theme::BUSY),
+        ProbeOutcome::Ready(_) => ("Ready", theme::OK),
+        ProbeOutcome::Failed(_) => ("Failed", theme::BAD),
     }
 }

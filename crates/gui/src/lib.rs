@@ -7,5 +7,6 @@ mod app;
 mod export;
 mod footage;
 mod picker;
+mod theme;
 
 pub use app::run;
