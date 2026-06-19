@@ -55,7 +55,7 @@ attempting transitions or FCPXML.
       regression harness only — Premiere/Resolve import not yet validated)
 - [ ] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
 - [ ] Audio cross-fade transitions (separate, validated against real imports) —
-      [#31](https://github.com/data-cartel/hollywood/issues/31)
+      [#31](https://github.com/dataclique/hollywood/issues/31)
 - [ ] Optional `.otio` export via native `serde_json` against a pinned schema
 
 ## Media I/O
@@ -115,12 +115,11 @@ NLE-native filters ([ADR 0006](./adrs/0006-audio-post-processing-stems.md),
 [SPEC §5.8](./SPEC.md)). Depends on decoded audio and the assembled timeline;
 **post-MVP**, lower priority than the core detect → sync → export pipeline.
 
-Tracked in [#32](https://github.com/data-cartel/hollywood/issues/32) —
-sub-issues #19 (IR vocabulary), #20 (R128 loudness + normalize), #21 (auto-EQ),
-#22 (dynamics), #23 (sidechain ducking), #24 (pipeline `process`/stems stage).
-Audio cross-fade export is
-[#31](https://github.com/data-cartel/hollywood/issues/31), under NLE export
-above.
+Tracked in [#32](https://github.com/dataclique/hollywood/issues/32) — sub-issues
+#19 (IR vocabulary), #20 (R128 loudness + normalize), #21 (auto-EQ), #22
+(dynamics), #23 (sidechain ducking), #24 (pipeline `process`/stems stage). Audio
+cross-fade export is [#31](https://github.com/dataclique/hollywood/issues/31),
+under NLE export above.
 
 ## Auto-framing & motion
 
@@ -132,10 +131,10 @@ transforms, never baked video
 [SPEC §5.9](./SPEC.md)). Needs a new video-frame decode capability and
 keyframed-transform export (higher-risk, like cross-fades); **post-MVP**.
 
-Tracked in [#33](https://github.com/data-cartel/hollywood/issues/33) —
-sub-issues #25 (video frame decode), #26 (IR transform/keyframes), #27 (NLE
-transform export), #28 (activity map), #29 (zoom planning), #30 (pipeline
-`reframe` stage).
+Tracked in [#33](https://github.com/dataclique/hollywood/issues/33) — sub-issues
+#25 (video frame decode), #26 (IR transform/keyframes), #27 (NLE transform
+export), #28 (activity map), #29 (zoom planning), #30 (pipeline `reframe`
+stage).
 
 ## Not epic
 

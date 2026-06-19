@@ -6,7 +6,7 @@ version = "0.1.0"
 edition = "2024"
 license = "BUSL-1.1"
 authors = ["Data Clique Software Design FZCO"]
-repository = "https://github.com/data-cartel/hollywood"
+repository = "https://github.com/dataclique/hollywood"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

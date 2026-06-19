@@ -56,7 +56,7 @@ nix flake check                # run pre-commit hooks + checks
 ```
 
 Version control uses the [GitButler](https://gitbutler.com) CLI (`but`),
-provisioned by the [`but.nix`](https://github.com/data-cartel/but.nix) flake
+provisioned by the [`but.nix`](https://github.com/dataclique/but.nix) flake
 input and available on the dev-shell `PATH`. See the gitbutler agent skill
 installed into `.claude/skills/gitbutler`.
 

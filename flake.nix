@@ -20,7 +20,7 @@
     crane.url = "github:ipetkov/crane";
 
     # GitButler CLI (`but`) + the gitbutler agent skill, packaged for reuse.
-    but.url = "github:data-cartel/but.nix";
+    but.url = "github:dataclique/but.nix";
     but.inputs.nixpkgs.follows = "nixpkgs";
   };
 
