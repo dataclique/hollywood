@@ -9,9 +9,11 @@
 //! Callers must invoke [`ffmpeg_next::init`] once at process startup before any
 //! probe — the root binary's `media::init` wrapper handles this for the app.
 
+pub mod decode;
 pub mod probe;
 
 mod error;
 
+pub use decode::{DecodeAudio, FfmpegDecoder, MonoAudio};
 pub use error::MediaError;
 pub use probe::{FfmpegProbe, MediaProbe, ProbedMedia};
