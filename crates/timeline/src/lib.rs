@@ -18,7 +18,7 @@
 //! an exporter.
 //!
 //! The NLE exporters, the assembler, and the pipeline all project to and from
-//! these types; see [`SPEC.md`](https://github.com/data-cartel/hollywood/blob/master/SPEC.md).
+//! these types; see [`SPEC.md`](https://github.com/dataclique/hollywood/blob/master/SPEC.md).
 //!
 //! ```
 //! use hollywood_timeline::{
