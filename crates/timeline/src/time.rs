@@ -54,6 +54,15 @@ impl Seconds {
         Self(Rational64::new(samples, i64::from(rate.0.get())))
     }
 
+    /// The number of whole samples this duration spans at `rate`, rounded to the
+    /// nearest sample. Lossy for a sub-sample duration; the exact inverse holds
+    /// only when the duration is already a whole number of samples at `rate`.
+    pub fn to_samples(self, rate: SampleRate) -> i64 {
+        (self.0 * Rational64::from_integer(i64::from(rate.0.get())))
+            .round()
+            .to_integer()
+    }
+
     /// The number of whole frames this duration spans at `rate`, rounded to the
     /// nearest frame. This is lossy for a sub-frame duration; to test exact
     /// frame alignment use the round-trip guard `from_frames(to_frames(t)) == t`
@@ -249,6 +258,15 @@ mod tests {
             Seconds::from_samples(24_000, rate),
             Seconds::new(1, 2).unwrap()
         );
+    }
+
+    #[test]
+    fn seconds_convert_to_samples() {
+        let rate = SampleRate::new(48_000).unwrap();
+        assert_eq!(Seconds::from_secs(1).to_samples(rate), 48_000);
+        assert_eq!(Seconds::new(1, 2).unwrap().to_samples(rate), 24_000);
+        // Sub-sample durations round to the nearest sample (1.2 samples -> 1).
+        assert_eq!(Seconds::new(1, 40_000).unwrap().to_samples(rate), 1);
     }
 
     #[test]
