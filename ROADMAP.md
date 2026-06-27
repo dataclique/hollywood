@@ -69,6 +69,7 @@ the two analysis crates.
       narrow trait
 - [x] Decode audio to mono sample buffers for analysis —
       [#39](https://github.com/dataclique/hollywood/issues/39)
+      ([#40](https://github.com/dataclique/hollywood/pull/40))
 - [ ] Fixture media + tests; keep the trait backend-swappable (Symphonia
       fallback)
 
