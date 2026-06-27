@@ -12,6 +12,15 @@ pub enum MediaError {
     /// The source has neither a video nor an audio stream.
     #[error("media has no video or audio streams")]
     NoStreams,
+    /// The source has no audio stream to decode (it may still have video).
+    #[error("media has no audio stream")]
+    NoAudioStream,
+    /// The source's audio stream decoded to no samples.
+    #[error("audio stream decoded to no samples")]
+    NoAudioData,
+    /// A decoded audio frame did not have the expected planar channel layout.
+    #[error("decoded audio frame had an unexpected channel layout")]
+    UnexpectedAudioLayout,
     /// Neither the container nor any stream reported a usable duration.
     #[error("media reported no usable duration")]
     UnknownDuration,
