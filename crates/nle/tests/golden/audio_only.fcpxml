@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE fcpxml>
+<fcpxml version="1.10">
+  <resources>
+    <format id="r1" frameDuration="1/30s" width="1920" height="1080"/>
+    <asset id="r2" name="vo.wav" start="0s" duration="1800/30s" hasVideo="0" hasAudio="1" audioSources="1" audioChannels="2" audioRate="48000">
+      <media-rep kind="original-media" src="vo.wav"/>
+    </asset>
+  </resources>
+  <library>
+    <event name="podcast">
+      <project name="podcast">
+        <sequence format="r1" duration="150/30s" tcStart="0s" tcFormat="NDF">
+          <spine>
+            <asset-clip ref="r2" offset="0s" name="voice" start="0s" duration="150/30s"/>
+          </spine>
+        </sequence>
+      </project>
+    </event>
+  </library>
+</fcpxml>

@@ -217,6 +217,61 @@ fn ntsc_frame_rate_is_rejected() {
     ));
 }
 
+/// An audio-only timeline (no video asset) — exercises the
+/// `DEFAULT_WIDTH`/`DEFAULT_HEIGHT` fallback for the sequence format and the
+/// audio-asset path that carries no `format` ref. Returns `Result` so the
+/// fixture stays `unwrap`-free; the `#[test]`s unwrap it.
+fn sample_audio_only_timeline() -> Result<Timeline, TimelineError> {
+    let stereo = AudioProperties {
+        sample_rate: SampleRate::new(48_000)?,
+        channels: ChannelLayout::Stereo,
+    };
+    let mut timeline = Timeline::new("podcast", FrameRate::whole(30)?);
+    timeline.add_asset(MediaAsset::new(
+        MediaSource::file("vo.wav"),
+        Seconds::from_secs(60),
+        None,
+        Some(stereo),
+    )?)?;
+    let mut audio = Track::new(TrackKind::Audio);
+    audio.push_clip(Clip::with_name(
+        MediaSource::file("vo.wav"),
+        TimeRange::new(Seconds::ZERO, Seconds::from_secs(5))?,
+        "voice",
+    ));
+    timeline.add_track(audio);
+    timeline.validate()?;
+    Ok(timeline)
+}
+
+#[test]
+fn audio_only_timeline_matches_golden() {
+    let timeline = sample_audio_only_timeline().unwrap();
+    assert_golden("audio_only.fcpxml", &to_fcpxml(&timeline).unwrap()).unwrap();
+}
+
+#[test]
+fn audio_only_timeline_uses_default_format_and_omits_video() {
+    let xml = to_fcpxml(&sample_audio_only_timeline().unwrap()).unwrap();
+    // No video asset -> the sequence format falls back to 1920x1080.
+    assert!(xml.contains(r#"width="1920""#));
+    assert!(xml.contains(r#"height="1080""#));
+    // The audio asset declares no video stream (and carries no `format` ref).
+    assert!(xml.contains(r#"hasVideo="0""#));
+    assert!(!xml.contains(r#"hasVideo="1""#));
+}
+
+#[test]
+fn connected_audio_offset_carries_the_host_clip_in_point() {
+    // The primary video clip is trimmed to a 2s in-point (start=60/30s). A
+    // connected clip's offset is in the host's local time, so the voice clip
+    // anchored to it must be emitted at that in-point (60/30s), which an
+    // importer resolves back to sequence time 0s — not the naive 0s offset that
+    // would resolve to -2s.
+    let xml = to_fcpxml(&sample_timeline().unwrap()).unwrap();
+    assert!(xml.contains(r#"<asset-clip ref="r4" lane="-1" offset="60/30s" name="voice""#));
+}
+
 /// Compare `actual` against the checked-in golden. A missing golden returns an
 /// error (which the caller surfaces) rather than being silently minted; pass
 /// `UPDATE_GOLDENS=1` to (re)write it after an intentional change.

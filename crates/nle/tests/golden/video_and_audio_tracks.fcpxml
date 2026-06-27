@@ -19,7 +19,7 @@
         <sequence format="r1" duration="240/30s" tcStart="0s" tcFormat="NDF">
           <spine>
             <asset-clip ref="r2" offset="0s" name="intro" start="60/30s" duration="90/30s">
-              <asset-clip ref="r4" lane="-1" offset="0s" name="voice" start="0s" duration="240/30s"/>
+              <asset-clip ref="r4" lane="-1" offset="60/30s" name="voice" start="0s" duration="240/30s"/>
             </asset-clip>
             <gap offset="90/30s" duration="30/30s"/>
             <asset-clip ref="r3" offset="120/30s" name="outro" start="300/30s" duration="120/30s"/>

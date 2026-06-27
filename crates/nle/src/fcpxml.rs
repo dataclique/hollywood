@@ -31,8 +31,9 @@ use crate::error::NleError;
 
 type XmlWriter = Writer<Vec<u8>>;
 
-/// FCPXML document version this exporter targets (Final Cut Pro 10.5+ / a
-/// version DaVinci Resolve also imports).
+/// FCPXML document version this exporter targets. Pinned per SPEC; the exact
+/// version range that Final Cut Pro and DaVinci Resolve both accept on import is
+/// not yet validated against a real NLE (tracked follow-up on #37).
 const FCPXML_VERSION: &str = "1.10";
 
 /// Default sequence geometry when the timeline carries no video asset to take
@@ -278,14 +279,10 @@ fn write_library(
 /// The longest track decides the sequence length; a transition does not advance
 /// a track, so [`Track::occupied`] already excludes it.
 fn total_duration(timeline: &Timeline) -> Result<Seconds, NleError> {
-    let mut total = Seconds::ZERO;
-    for track in timeline.tracks() {
-        let occupied = track.occupied()?;
-        if occupied > total {
-            total = occupied;
-        }
-    }
-    Ok(total)
+    timeline
+        .tracks()
+        .iter()
+        .try_fold(Seconds::ZERO, |max, track| Ok(max.max(track.occupied()?)))
 }
 
 fn write_spine(
@@ -297,18 +294,18 @@ fn write_spine(
     start(writer, "spine")?;
 
     let tracks = timeline.tracks();
-    let Some(primary_index) = tracks.iter().position(|track| !track.items().is_empty()) else {
+    let Some((primary_index, primary)) = primary_track(tracks) else {
         // No items on any track: an empty spine is still a valid sequence.
         return end(writer, "spine");
     };
-    let Some(primary) = tracks.get(primary_index) else {
-        return end(writer, "spine");
-    };
 
-    // Every non-primary track becomes connected clips anchored to the first
-    // spine element (which sits at offset 0, so their absolute timeline offsets
-    // are also their offsets within that anchor). Video lanes composite above
-    // the primary, audio lanes below.
+    // Every non-primary track is emitted as connected clips nested in the first
+    // spine element. A connected clip's `offset` is in its host's LOCAL time,
+    // anchored at the host's source in-point — so it is the host's `start` plus
+    // the clip's absolute timeline offset (the host sits at sequence offset 0).
+    // A gap host has an implicit `start` of zero; a clip host carries its
+    // in-point, which is non-zero whenever footage was trimmed. Video lanes
+    // composite above the primary, audio lanes below.
     let connected = collect_connected(resources, rate, tracks, primary_index)?;
 
     let mut position = Seconds::ZERO;
@@ -322,7 +319,7 @@ fn write_spine(
                 ];
                 if host {
                     start_element(writer, "gap", &attrs)?;
-                    write_connected(writer, resources, rate, &connected)?;
+                    write_connected(writer, resources, rate, &connected, Seconds::ZERO)?;
                     end(writer, "gap")?;
                 } else {
                     empty_element(writer, "gap", &attrs)?;
@@ -333,7 +330,7 @@ fn write_spine(
                 let attrs = asset_clip_attrs(resources, rate, clip, position, None)?;
                 if host {
                     start_element(writer, "asset-clip", &attrs)?;
-                    write_connected(writer, resources, rate, &connected)?;
+                    write_connected(writer, resources, rate, &connected, clip.range().start())?;
                     end(writer, "asset-clip")?;
                 } else {
                     empty_element(writer, "asset-clip", &attrs)?;
@@ -345,6 +342,21 @@ fn write_spine(
     }
 
     end(writer, "spine")
+}
+
+/// The track that drives the FCPXML spine: the first non-empty **video** track,
+/// else the first non-empty audio track. FCPXML collapses the timeline onto one
+/// primary storyline (everything else hangs off it on connected lanes), so a
+/// later video track must still win the spine over an earlier audio track to
+/// keep the A-roll/B-roll hierarchy that the multi-track IR expresses.
+fn primary_track(tracks: &[Track]) -> Option<(usize, &Track)> {
+    let first_non_empty = |kind: TrackKind| {
+        tracks
+            .iter()
+            .enumerate()
+            .find(move |(_, track)| track.kind() == kind && !track.items().is_empty())
+    };
+    first_non_empty(TrackKind::Video).or_else(|| first_non_empty(TrackKind::Audio))
 }
 
 /// A clip from a non-primary track, placed at its absolute timeline `offset` on
@@ -405,9 +417,15 @@ fn write_connected(
     resources: &Resources<'_>,
     rate: FrameRate,
     connected: &[Connected<'_>],
+    host_start: Seconds,
 ) -> Result<(), NleError> {
     for item in connected {
-        let attrs = asset_clip_attrs(resources, rate, item.clip, item.offset, Some(item.lane))?;
+        // Express the connected clip's offset in the host's local time: the
+        // host's in-point plus the clip's absolute timeline offset. The importer
+        // resolves it back to `host.offset(0) + (offset - host.start)` = the
+        // intended sequence time.
+        let offset = advance(host_start, item.offset)?;
+        let attrs = asset_clip_attrs(resources, rate, item.clip, offset, Some(item.lane))?;
         empty_element(writer, "asset-clip", &attrs)?;
     }
     Ok(())
