@@ -3,8 +3,10 @@
 //! The signal is split into fixed analysis windows; each window's root-mean-
 //! square level is compared to a threshold to label it active (speech) or silent
 //! (dead air). Runs of active windows become regions, each padded so speech
-//! onsets and tails are not clipped — and so brief pauses shorter than the
-//! padding on each side are bridged rather than cut into choppy fragments.
+//! onsets and tails are not clipped. Padding also bridges short pauses: two
+//! regions merge when the gap between them is at most twice the padding. A pause
+//! must span at least one full analysis window to be detected as a gap at all,
+//! so sub-window pauses never split a run.
 
 use hollywood_timeline::{SampleRate, Seconds, TimeRange};
 
@@ -43,7 +45,8 @@ impl SilenceGate {
     ///
     /// [`DetectError::NonPositiveWindow`] if `window` is not positive,
     /// [`DetectError::NegativePadding`] if `padding` is negative, and
-    /// [`DetectError::NonFiniteThreshold`] if `threshold` is not finite.
+    /// [`DetectError::InvalidThreshold`] if `threshold` does not convert to a
+    /// finite, positive amplitude (which would invert or disable gating).
     pub fn new(window: Seconds, threshold: Dbfs, padding: Seconds) -> Result<Self, DetectError> {
         if window.is_negative() || window.is_zero() {
             return Err(DetectError::NonPositiveWindow);
@@ -51,14 +54,30 @@ impl SilenceGate {
         if padding.is_negative() {
             return Err(DetectError::NegativePadding);
         }
-        if !threshold.linear().is_finite() {
-            return Err(DetectError::NonFiniteThreshold);
+        let linear = threshold.linear();
+        if !linear.is_finite() || linear <= 0.0 {
+            return Err(DetectError::InvalidThreshold);
         }
         Ok(Self {
             window,
             threshold,
             padding,
         })
+    }
+
+    /// The analysis window duration.
+    pub fn window(self) -> Seconds {
+        self.window
+    }
+
+    /// The silence threshold.
+    pub fn threshold(self) -> Dbfs {
+        self.threshold
+    }
+
+    /// The padding applied to each side of a kept region.
+    pub fn padding(self) -> Seconds {
+        self.padding
     }
 }
 
@@ -69,69 +88,94 @@ impl SilenceGate {
 /// # Errors
 ///
 /// [`DetectError::InvalidWindow`] if the window spans no usable samples at
-/// `rate`, [`DetectError::DurationOverflow`] if a region exceeds representable
+/// `rate`, [`DetectError::NonFiniteSample`] if the signal contains a NaN or
+/// infinity, [`DetectError::DurationOverflow`] if a region exceeds representable
 /// time, and [`DetectError::Timeline`] if the IR rejects a region.
 pub fn keep_regions(
     samples: &[f32],
     rate: SampleRate,
     gate: &SilenceGate,
 ) -> Result<Vec<TimeRange>, DetectError> {
-    let window_samples = usize::try_from(gate.window.to_samples(rate))
-        .ok()
+    let window_samples = gate
+        .window
+        .checked_to_samples(rate)
+        .and_then(|count| usize::try_from(count).ok())
         .filter(|&count| count >= 1)
         .ok_or(DetectError::InvalidWindow)?;
     let threshold = gate.threshold.linear();
 
-    let active_runs = active_runs(samples, window_samples, threshold)?;
+    let runs = active_runs(samples, window_samples, threshold)?;
     let total = samples_to_seconds(samples.len(), rate)?;
 
-    let mut keep: Vec<(Seconds, Seconds)> = Vec::new();
-    for (start, end) in active_runs {
-        let region_start = pad_start(samples_to_seconds(start, rate)?, gate.padding)?;
-        let region_end = pad_end(samples_to_seconds(end, rate)?, gate.padding, total)?;
+    let mut keep: Vec<Span> = Vec::new();
+    for run in runs {
+        let start = pad_start(samples_to_seconds(run.start, rate)?, gate.padding)?;
+        let end = pad_end(samples_to_seconds(run.end, rate)?, gate.padding, total)?;
         match keep.last_mut() {
             // Overlapping or padding-adjacent: extend the previous region.
-            Some(last) if region_start <= last.1 => last.1 = last.1.max(region_end),
-            _ => keep.push((region_start, region_end)),
+            Some(last) if start <= last.end => last.end = last.end.max(end),
+            _ => keep.push(Span { start, end }),
         }
     }
 
     keep.into_iter()
-        .map(|(start, end)| {
-            let duration = end
-                .checked_sub(start)
+        .map(|span| {
+            let duration = span
+                .end
+                .checked_sub(span.start)
                 .ok_or(DetectError::DurationOverflow)?;
-            Ok(TimeRange::new(start, duration)?)
+            Ok(TimeRange::new(span.start, duration)?)
         })
         .collect()
 }
 
-/// The half-open sample spans `[start, end)` of consecutive active windows.
+/// A keep region as a half-open `[start, end)` span in seconds.
+struct Span {
+    start: Seconds,
+    end: Seconds,
+}
+
+/// A half-open `[start, end)` span of samples covering consecutive active windows.
+struct SampleSpan {
+    start: usize,
+    end: usize,
+}
+
+/// The sample spans of consecutive active windows, in order.
 fn active_runs(
     samples: &[f32],
     window_samples: usize,
     threshold: f64,
-) -> Result<Vec<(usize, usize)>, DetectError> {
+) -> Result<Vec<SampleSpan>, DetectError> {
     let mut runs = Vec::new();
     let mut offset = 0usize;
     let mut current: Option<usize> = None;
     for window in samples.chunks(window_samples) {
         let active = window_rms(window)? >= threshold;
         let start = offset;
+        // Advance by the window's own length so a short final chunk is exact.
         offset = offset.saturating_add(window.len());
         if active {
             current.get_or_insert(start);
         } else if let Some(run_start) = current.take() {
-            runs.push((run_start, start));
+            runs.push(SampleSpan {
+                start: run_start,
+                end: start,
+            });
         }
     }
     if let Some(run_start) = current.take() {
-        runs.push((run_start, offset));
+        runs.push(SampleSpan {
+            start: run_start,
+            end: offset,
+        });
     }
     Ok(runs)
 }
 
-/// Root-mean-square level of one window. An empty window has none (`0.0`).
+/// Root-mean-square level of one window. An empty window has none (`0.0`); a
+/// window containing a non-finite sample is an error rather than a silent
+/// misclassification.
 fn window_rms(window: &[f32]) -> Result<f64, DetectError> {
     // `u32 -> f64` is lossless; a window never holds more than `u32::MAX` samples.
     let count = u32::try_from(window.len()).map_err(|_| DetectError::InvalidWindow)?;
@@ -142,7 +186,12 @@ fn window_rms(window: &[f32]) -> Result<f64, DetectError> {
         .iter()
         .map(|&sample| f64::from(sample) * f64::from(sample))
         .sum();
-    Ok((sum_squares / f64::from(count)).sqrt())
+    let rms = (sum_squares / f64::from(count)).sqrt();
+    if rms.is_finite() {
+        Ok(rms)
+    } else {
+        Err(DetectError::NonFiniteSample)
+    }
 }
 
 fn samples_to_seconds(count: usize, rate: SampleRate) -> Result<Seconds, DetectError> {
@@ -195,6 +244,15 @@ mod tests {
         vec![level; usize::try_from(seconds * i64::from(RATE_HZ)).unwrap()]
     }
 
+    /// `count` samples of silence (sub-second gaps the `block` helper can't make).
+    fn silence(count: usize) -> Vec<f32> {
+        vec![0.0; count]
+    }
+
+    fn seconds(numerator: i64, denominator: i64) -> Seconds {
+        Seconds::new(numerator, denominator).unwrap()
+    }
+
     #[test]
     fn silence_then_tone_then_silence_is_one_padded_region() {
         // 1 s silence, 1 s at 0.5 (RMS 0.5 > 0.1), 1 s silence.
@@ -206,8 +264,8 @@ mod tests {
 
         // Active run [1 s, 2 s] padded by 100 ms -> [0.9 s, 2.1 s].
         assert_eq!(regions.len(), 1);
-        assert_eq!(regions[0].start(), Seconds::new(9, 10).unwrap());
-        assert_eq!(regions[0].end(), Seconds::new(21, 10).unwrap());
+        assert_eq!(regions[0].start(), seconds(9, 10));
+        assert_eq!(regions[0].end(), seconds(21, 10));
     }
 
     #[test]
@@ -232,25 +290,110 @@ mod tests {
     }
 
     #[test]
+    fn alternating_signal_is_detected_active() {
+        // RMS of +/-0.5 is 0.5 (> 0.1); a sum-instead-of-squares bug would read
+        // ~0 and miss it. Whole signal active -> one region [0 s, 1 s].
+        let samples: Vec<f32> = (0..usize::try_from(RATE_HZ).unwrap())
+            .map(|index| if index % 2 == 0 { 0.5 } else { -0.5 })
+            .collect();
+        let regions = keep_regions(&samples, rate(), &gate()).unwrap();
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].start(), Seconds::ZERO);
+        assert_eq!(regions[0].end(), Seconds::from_secs(1));
+    }
+
+    #[test]
     fn short_gap_within_padding_is_bridged() {
-        // tone, 0.1 s silence (< 2x padding), tone -> one merged region.
+        // tone, 0.1 s silence (< 2x padding = 0.2 s), tone -> one merged region.
         let mut samples = block(0.5, 1);
-        samples.extend(vec![0.0; usize::try_from(RATE_HZ / 10).unwrap()]);
+        samples.extend(silence(usize::try_from(RATE_HZ / 10).unwrap()));
         samples.extend(block(0.5, 1));
 
         let regions = keep_regions(&samples, rate(), &gate()).unwrap();
+        // Both ends clamp: [0 s, 2.1 s] (total = 2.1 s).
         assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].start(), Seconds::ZERO);
+        assert_eq!(regions[0].end(), seconds(21, 10));
+    }
+
+    #[test]
+    fn gap_equal_to_twice_padding_is_bridged() {
+        // 0.2 s gap == 2x padding: padded boundaries touch exactly -> merge.
+        let mut samples = block(0.5, 1);
+        samples.extend(silence(usize::try_from(RATE_HZ / 5).unwrap())); // 0.2 s
+        samples.extend(block(0.5, 1));
+
+        let regions = keep_regions(&samples, rate(), &gate()).unwrap();
+        // total = 2.2 s; merged and clamped -> [0 s, 2.2 s].
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].start(), Seconds::ZERO);
+        assert_eq!(regions[0].end(), seconds(11, 5));
     }
 
     #[test]
     fn long_gap_beyond_padding_stays_cut() {
-        // tone, 1 s silence (> 2x padding), tone -> two regions.
+        // 1 s silence (> 2x padding) -> two regions with exact boundaries.
         let mut samples = block(0.5, 1);
         samples.extend(block(0.0, 1));
         samples.extend(block(0.5, 1));
 
         let regions = keep_regions(&samples, rate(), &gate()).unwrap();
         assert_eq!(regions.len(), 2);
+        // [0 s, 1.1 s] and [1.9 s, 3 s].
+        assert_eq!(regions[0].start(), Seconds::ZERO);
+        assert_eq!(regions[0].end(), seconds(11, 10));
+        assert_eq!(regions[1].start(), seconds(19, 10));
+        assert_eq!(regions[1].end(), Seconds::from_secs(3));
+    }
+
+    #[test]
+    fn partial_final_window_is_captured() {
+        // 1 s tone (whole windows) + 200 active samples (a partial final chunk).
+        let mut samples = block(0.5, 1);
+        samples.extend(vec![0.5_f32; 200]);
+
+        let regions = keep_regions(&samples, rate(), &gate()).unwrap();
+        // Run reaches the true end; padded end clamps to total = 8200/8000 s.
+        assert_eq!(regions.len(), 1);
+        assert_eq!(regions[0].start(), Seconds::ZERO);
+        assert_eq!(regions[0].end(), seconds(41, 40));
+    }
+
+    #[test]
+    fn window_below_one_sample_is_invalid() {
+        // 1/100000 s at 8000 Hz is 0.08 samples -> rounds to 0.
+        let tiny = SilenceGate::new(seconds(1, 100_000), Dbfs::new(-20.0), seconds(1, 10)).unwrap();
+        let samples = block(0.5, 1);
+        assert!(matches!(
+            keep_regions(&samples, rate(), &tiny),
+            Err(DetectError::InvalidWindow)
+        ));
+    }
+
+    #[test]
+    fn non_finite_samples_are_rejected() {
+        let mut samples = block(0.5, 1);
+        samples[0] = f32::NAN;
+        assert!(matches!(
+            keep_regions(&samples, rate(), &gate()),
+            Err(DetectError::NonFiniteSample)
+        ));
+    }
+
+    #[test]
+    fn gate_rejects_degenerate_threshold() {
+        let window = seconds(1, 20);
+        let padding = Seconds::ZERO;
+        // -inf dBFS underflows to linear 0 (would label silence active).
+        assert!(matches!(
+            SilenceGate::new(window, Dbfs::new(f32::NEG_INFINITY), padding),
+            Err(DetectError::InvalidThreshold)
+        ));
+        // A huge positive dBFS overflows to infinite linear.
+        assert!(matches!(
+            SilenceGate::new(window, Dbfs::new(10_000.0), padding),
+            Err(DetectError::InvalidThreshold)
+        ));
     }
 
     #[test]
@@ -263,11 +406,18 @@ mod tests {
 
     #[test]
     fn gate_rejects_negative_padding() {
-        let negative = Seconds::new(-1, 10).unwrap();
         assert!(matches!(
-            SilenceGate::new(Seconds::new(1, 20).unwrap(), Dbfs::new(-40.0), negative),
+            SilenceGate::new(seconds(1, 20), Dbfs::new(-40.0), seconds(-1, 10)),
             Err(DetectError::NegativePadding)
         ));
+    }
+
+    #[test]
+    fn gate_exposes_its_configuration() {
+        let configured = gate();
+        assert_eq!(configured.window(), seconds(1, 20));
+        assert_eq!(configured.threshold(), Dbfs::new(-20.0));
+        assert_eq!(configured.padding(), seconds(1, 10));
     }
 
     #[test]
