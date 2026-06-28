@@ -142,6 +142,9 @@ stage).
       ported from the house template
 - [ ] Multicam (`<mc-clip>`) export
 - [ ] CI golden-file checks against real Resolve/Premiere installs
+- [x] Glossary catch-up for recent domain terms —
+      [#49](https://github.com/dataclique/hollywood/issues/49)
+      ([#50](https://github.com/dataclique/hollywood/pull/50))
 
 ## Completed: Foundation
 
