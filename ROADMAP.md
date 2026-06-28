@@ -92,6 +92,7 @@ Timeline IR (to express keep/cut regions and offsets).
       ([#44](https://github.com/dataclique/hollywood/pull/44))
 - [x] GCC-PHAT as an opt-in strategy —
       [#45](https://github.com/dataclique/hollywood/issues/45)
+      ([#46](https://github.com/dataclique/hollywood/pull/46))
 - [ ] Piecewise drift map for long recordings
 
 ## Pipeline orchestration
