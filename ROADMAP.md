@@ -80,7 +80,8 @@ Timeline IR (to express keep/cut regions and offsets).
 - [ ] `crates/hollywood-detect`: RMS/peak silence gating → keep/cut regions with
       padding
 - [ ] Silero VAD via `ort` for non-speech detection; `webrtc-vad` fallback
-- [ ] `crates/hollywood-sync`: cross-correlation alignment (`rustfft`/`realfft`)
+- [x] `crates/hollywood-sync`: cross-correlation alignment (`rustfft`/`realfft`)
+      — [#43](https://github.com/dataclique/hollywood/issues/43)
 - [ ] GCC-PHAT as opt-in strategy; piecewise drift map for long recordings
 
 ## Pipeline orchestration
