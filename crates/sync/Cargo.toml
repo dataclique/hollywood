@@ -1,0 +1,16 @@
+[package]
+name = "hollywood-sync"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Multi-source audio alignment: cross-correlate two mono signals to find their timeline offset."
+
+[dependencies]
+hollywood-timeline.workspace = true
+realfft.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

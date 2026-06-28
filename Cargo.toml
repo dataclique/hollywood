@@ -58,10 +58,14 @@ rfd = "0.17"
 # Media I/O. ffmpeg-next 8.x tracks FFmpeg 8; the dev shell pins the libraries.
 ffmpeg-next = "8"
 
+# Audio DSP. realfft wraps rustfft for real-signal FFT (cross-correlation sync).
+realfft = "3.5.0"
+
 # Intra-workspace crates.
 hollywood-detect.path = "crates/detect"
 hollywood-ffmpeg.path = "crates/ffmpeg"
 hollywood-gui.path = "crates/gui"
+hollywood-sync.path = "crates/sync"
 hollywood-timeline.path = "crates/timeline"
 
 [package]
