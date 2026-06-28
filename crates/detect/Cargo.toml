@@ -1,0 +1,15 @@
+[package]
+name = "hollywood-detect"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Silence detection: gate a mono signal into padded keep/cut regions over the timeline."
+
+[dependencies]
+hollywood-timeline.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

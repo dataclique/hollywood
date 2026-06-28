@@ -8,7 +8,7 @@ use std::num::NonZeroU32;
 use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 use num_rational::Rational64;
-use num_traits::{CheckedAdd, CheckedSub, Signed, ToPrimitive, Zero};
+use num_traits::{CheckedAdd, CheckedMul, CheckedSub, Signed, ToPrimitive, Zero};
 
 use crate::error::TimelineError;
 
@@ -52,6 +52,16 @@ impl Seconds {
     /// The duration spanned by `samples` samples at `rate`.
     pub fn from_samples(samples: i64, rate: SampleRate) -> Self {
         Self(Rational64::new(samples, i64::from(rate.0.get())))
+    }
+
+    /// The number of whole samples this duration spans at `rate`, rounded to the
+    /// nearest sample, or `None` if the duration is so large the conversion
+    /// overflows `i64`. Lossy for a sub-sample duration; the exact inverse holds
+    /// only when the duration is already a whole number of samples at `rate`.
+    pub fn checked_to_samples(self, rate: SampleRate) -> Option<i64> {
+        self.0
+            .checked_mul(&Rational64::from_integer(i64::from(rate.0.get())))
+            .map(|scaled| scaled.round().to_integer())
     }
 
     /// The number of whole frames this duration spans at `rate`, rounded to the
@@ -248,6 +258,26 @@ mod tests {
         assert_eq!(
             Seconds::from_samples(24_000, rate),
             Seconds::new(1, 2).unwrap()
+        );
+    }
+
+    #[test]
+    fn seconds_convert_to_samples() {
+        let rate = SampleRate::new(48_000).unwrap();
+        assert_eq!(Seconds::from_secs(1).checked_to_samples(rate), Some(48_000));
+        assert_eq!(
+            Seconds::new(1, 2).unwrap().checked_to_samples(rate),
+            Some(24_000)
+        );
+        // Sub-sample durations round to the nearest sample (1.2 samples -> 1).
+        assert_eq!(
+            Seconds::new(1, 40_000).unwrap().checked_to_samples(rate),
+            Some(1)
+        );
+        // An extreme duration overflows the conversion rather than panicking.
+        assert_eq!(
+            Seconds::new(i64::MAX, 1).unwrap().checked_to_samples(rate),
+            None
         );
     }
 
