@@ -1,12 +1,13 @@
 //! FCP7 `xmeml` (XMEML v5) exporter — the one interchange format that imports
 //! natively in **both** Premiere Pro and DaVinci Resolve.
 //!
-//! This exporter handles multi-track timelines of hard cuts (clips and gaps).
-//! A clip's timeline position is the running sum of the clips and gaps before
-//! it; xmeml times are integer frames at the sequence timebase. Audio
-//! cross-fades (transitions) and fractional NTSC frame rates are tracked as
-//! follow-up work — the exporter returns an error rather than emit something an
-//! NLE would silently misread.
+//! This exporter handles multi-track timelines of hard cuts (clips and gaps)
+//! and audio cross-fades. A clip's timeline position is the running sum of the
+//! clips and gaps before it; xmeml times are integer frames at the sequence
+//! timebase. A cross-fade is emitted as a centered `transitionitem` overlaying
+//! the cut between its two clips, mirroring the FCP7 track model. Fractional
+//! NTSC frame rates remain follow-up work — the exporter returns an error
+//! rather than emit something an NLE would silently misread.
 
 use std::collections::HashMap;
 
@@ -29,9 +30,8 @@ type AssetIds<'a> = HashMap<&'a MediaSource, String>;
 ///
 /// Returns [`NleError::InvalidTimeline`] if the timeline fails its own
 /// validation, [`NleError::UnsupportedFrameRate`] for fractional (NTSC) rates,
-/// [`NleError::UnsupportedTransition`] if any track contains a transition, and
-/// [`NleError::UnalignedDuration`] if a clip or gap is not a whole number of
-/// frames at the sequence rate.
+/// and [`NleError::UnalignedDuration`] if a clip, gap, or cross-fade is not a
+/// whole number of frames at the sequence rate.
 pub fn to_xmeml(timeline: &Timeline) -> Result<String, NleError> {
     // The IR is only coherent once validated; never export an unvalidated one.
     timeline.validate()?;
@@ -130,10 +130,59 @@ fn write_track(
                 let end_frame = frames_exact(position, rate)?;
                 write_clipitem(writer, ids, clip, rate, start_frame, end_frame)?;
             }
-            TrackItem::Transition(_) => return Err(NleError::UnsupportedTransition),
+            TrackItem::Transition(transition) => {
+                // The fade overlays the cut without advancing the track, so
+                // `position` is already the cut frame (where the next clip
+                // begins). The transition is centered on that cut: `lead` frames
+                // precede it and `span - lead` follow. An odd-frame fade cannot
+                // split evenly on an integer timebase, so `lead = span / 2` puts
+                // the extra frame after the cut — but the cut itself stays pinned
+                // by the abutting clipitems (take-1 `end` == take-2 `start`), so
+                // `center` is still the faithful alignment. `validate()`
+                // guarantees the fade fits within both neighbours, so the start
+                // frame never precedes the timeline origin.
+                let cut_frame = frames_exact(position, rate)?;
+                let span = frames_exact(transition.duration(), rate)?;
+                let lead = span / 2;
+                write_transitionitem(writer, rate, cut_frame - lead, cut_frame - lead + span)?;
+            }
         }
     }
     end(writer, "track")
+}
+
+/// Display name and machine id of the constant-power (+3 dB) audio cross-fade —
+/// the default audio dissolve, and the right choice for joining two independent
+/// takes without the perceived loudness dip a linear (0 dB) fade would cause.
+const CROSS_FADE_NAME: &str = "Cross Fade (+3dB)";
+const CROSS_FADE_ID: &str = "KGAudioTransCrossFade3dB";
+
+/// Emit a centered audio cross-fade `transitionitem` spanning `[start_frame,
+/// end_frame)` (`end_frame - start_frame` frames). It sits between the two
+/// clipitems it joins; `center` declares the cut at — or, for an odd-frame fade,
+/// as close as the integer timebase allows to — the midpoint. The abutting
+/// clipitems pin the real cut, so that half-frame offset never moves the edit
+/// (see the `write_track` call site for the convention).
+fn write_transitionitem(
+    writer: &mut XmlWriter,
+    rate: FrameRate,
+    start_frame: i64,
+    end_frame: i64,
+) -> Result<(), NleError> {
+    start(writer, "transitionitem")?;
+    write_rate(writer, rate)?;
+    text_element(writer, "start", &start_frame.to_string())?;
+    text_element(writer, "end", &end_frame.to_string())?;
+    text_element(writer, "alignment", "center")?;
+
+    start(writer, "effect")?;
+    text_element(writer, "name", CROSS_FADE_NAME)?;
+    text_element(writer, "effectid", CROSS_FADE_ID)?;
+    text_element(writer, "effecttype", "transition")?;
+    text_element(writer, "mediatype", "audio")?;
+    end(writer, "effect")?;
+
+    end(writer, "transitionitem")
 }
 
 fn write_clipitem(

@@ -58,8 +58,13 @@ attempting transitions or FCPXML.
       import not yet validated) —
       [#37](https://github.com/dataclique/hollywood/issues/37)
       ([#38](https://github.com/dataclique/hollywood/pull/38))
-- [ ] Audio cross-fade transitions (separate, validated against real imports) —
-      [#31](https://github.com/dataclique/hollywood/issues/31)
+- [x] Audio cross-fade — FCP7 **xmeml** centered `transitionitem` (primary
+      format; golden-file regression harness only — real Premiere/Resolve import
+      not yet validated) —
+      [#51](https://github.com/dataclique/hollywood/issues/51)
+      ([#52](https://github.com/dataclique/hollywood/pull/52))
+- [ ] Audio cross-fade — **FCPXML** (Final Cut / Resolve), validated against a
+      real import — [#31](https://github.com/dataclique/hollywood/issues/31)
 - [ ] Optional `.otio` export via native `serde_json` against a pinned schema
 
 ## Media I/O

@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmeml version="5">
+  <sequence>
+    <name>demo</name>
+    <rate>
+      <timebase>30</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <media>
+      <audio>
+        <track>
+          <clipitem>
+            <name>take-1</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>60</end>
+            <in>0</in>
+            <out>60</out>
+            <file id="file-1">
+              <name>vo1.wav</name>
+              <pathurl>vo1.wav</pathurl>
+            </file>
+          </clipitem>
+          <transitionitem>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>45</start>
+            <end>75</end>
+            <alignment>center</alignment>
+            <effect>
+              <name>Cross Fade (+3dB)</name>
+              <effectid>KGAudioTransCrossFade3dB</effectid>
+              <effecttype>transition</effecttype>
+              <mediatype>audio</mediatype>
+            </effect>
+          </transitionitem>
+          <clipitem>
+            <name>take-2</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>60</start>
+            <end>120</end>
+            <in>90</in>
+            <out>150</out>
+            <file id="file-2">
+              <name>vo2.wav</name>
+              <pathurl>vo2.wav</pathurl>
+            </file>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+  </sequence>
+</xmeml>
