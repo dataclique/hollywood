@@ -1,0 +1,15 @@
+[package]
+name = "hollywood-pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Pipeline orchestration: run the probe → detect → sync → assemble → export stages in order with progress reporting."
+
+[dependencies]
+thiserror.workspace = true
+tokio = { workspace = true, features = ["sync"] }
+
+[lints]
+workspace = true
