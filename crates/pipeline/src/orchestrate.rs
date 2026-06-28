@@ -13,6 +13,12 @@ use crate::stage::PipelineStage;
 /// stays independent of the concrete probe/detect/sync/assemble/export
 /// implementations.
 ///
+/// This sequences stages and tracks progress; it does not thread data between
+/// them. The caller's `run_stage` owns each stage's inputs and outputs — e.g.
+/// over a context it captures — so the concrete wiring decides how the
+/// probe → … → export data flows. (That wiring will confirm this closure shape
+/// holds; a stateful flow may instead want a context-passing trait.)
+///
 /// # Errors
 ///
 /// [`PipelineError::Stage`] for the first stage whose `run_stage` returns `Err`,
