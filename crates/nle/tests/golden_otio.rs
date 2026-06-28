@@ -144,6 +144,49 @@ fn cross_fade_becomes_a_transition_between_its_clips() {
 }
 
 #[test]
+fn odd_frame_cross_fade_splits_the_transition_offsets() {
+    // A 3-frame fade (0.1s at 30fps) can't split evenly: lead = 3 / 2 = 1 frame
+    // reaches into the preceding clip, the remaining 2 into the following one.
+    // This pins the centering convention the even-span golden cannot.
+    let stereo = AudioProperties {
+        sample_rate: SampleRate::new(48_000).unwrap(),
+        channels: ChannelLayout::Stereo,
+    };
+    let mut timeline = Timeline::new("demo", FrameRate::whole(30).unwrap());
+    timeline
+        .add_asset(
+            MediaAsset::new(
+                MediaSource::file("vo.wav"),
+                Seconds::from_secs(60),
+                None,
+                Some(stereo),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+    let mut track = Track::new(TrackKind::Audio);
+    track.push_clip(Clip::new(
+        MediaSource::file("vo.wav"),
+        TimeRange::new(Seconds::ZERO, Seconds::from_secs(2)).unwrap(),
+    ));
+    track
+        .push_transition(Transition::cross_fade(Seconds::new(3, 30).unwrap()).unwrap())
+        .unwrap();
+    track.push_clip(Clip::new(
+        MediaSource::file("vo.wav"),
+        TimeRange::new(Seconds::from_secs(3), Seconds::from_secs(2)).unwrap(),
+    ));
+    timeline.add_track(track);
+    timeline.validate().unwrap();
+
+    let value: serde_json::Value = serde_json::from_str(&to_otio(&timeline).unwrap()).unwrap();
+    let transition = &value["tracks"]["children"][0]["children"][1];
+    assert_eq!(transition["OTIO_SCHEMA"], "Transition.1");
+    assert_eq!(transition["in_offset"]["value"], 1);
+    assert_eq!(transition["out_offset"]["value"], 2);
+}
+
+#[test]
 fn sub_frame_duration_is_rejected() {
     let video = VideoProperties {
         frame_rate: FrameRate::whole(30).unwrap(),

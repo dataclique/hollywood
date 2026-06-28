@@ -299,12 +299,13 @@ mod tests {
             Seconds::new(1001, 1000).unwrap().as_exact_rational(),
             (1001, 1000)
         );
-        // The fraction is reduced and the sign stays on the numerator.
+        // The fraction is reduced and the sign stays on the numerator — proven
+        // with non-reduced inputs so reduction, not pass-through, is tested.
         assert_eq!(
             Seconds::new(24_000, 48_000).unwrap().as_exact_rational(),
             (1, 2)
         );
-        assert_eq!(Seconds::new(-3, 2).unwrap().as_exact_rational(), (-3, 2));
+        assert_eq!(Seconds::new(-6, 4).unwrap().as_exact_rational(), (-3, 2));
     }
 
     #[test]
