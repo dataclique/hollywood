@@ -114,7 +114,13 @@ app and CLI drive the same code. Depends on everything above.
       ([#48](https://github.com/dataclique/hollywood/pull/48))
 - [ ] Durable apalis-SQLite backend behind the abstract job interface (tokio
       fallback); WAL + `busy_timeout`
-- [ ] Stage chain: wire probe → detect → sync → assemble IR → export
+- [x] `crates/assemble`: the `assemble` stage's capability — lay
+      silence-detection keep-regions into a back-to-back timeline, trimming the
+      dead air between them —
+      [#55](https://github.com/dataclique/hollywood/issues/55)
+      ([#56](https://github.com/dataclique/hollywood/pull/56))
+- [ ] Stage chain: wire probe → detect → sync → assemble IR → export (the
+      `assemble` building block now exists; the data-threaded wiring does not)
 
 ## Desktop app + CLI
 
