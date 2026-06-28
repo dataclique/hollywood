@@ -15,6 +15,10 @@ pub enum SyncError {
     /// uncorrelated and no meaningful offset exists.
     #[error("signals have no correlation peak")]
     NoPeak,
+    /// Neither signal is long enough to hold a single drift-map window, so no
+    /// alignment can be measured.
+    #[error("signal is shorter than the drift-map window")]
+    SignalShorterThanWindow,
     /// The underlying FFT failed.
     #[error("FFT failed: {0}")]
     Fft(#[from] realfft::FftError),
