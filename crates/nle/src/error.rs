@@ -23,12 +23,12 @@ pub enum NleError {
     #[error("serialized output was not valid utf-8: {0}")]
     Encoding(#[from] std::string::FromUtf8Error),
 
-    /// The timeline uses a fractional (NTSC) frame rate, which the xmeml
-    /// exporter does not handle yet.
-    #[error("non-integer (NTSC) frame rates are not yet supported by the xmeml exporter")]
+    /// The timeline uses a fractional (NTSC) frame rate, which the exporters do
+    /// not handle yet.
+    #[error("non-integer (NTSC) frame rates are not yet supported")]
     UnsupportedFrameRate,
 
     /// The timeline contains a transition; only hard cuts are supported so far.
-    #[error("transitions are not yet supported by the xmeml exporter")]
+    #[error("transitions are not yet supported")]
     UnsupportedTransition,
 }

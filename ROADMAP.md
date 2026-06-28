@@ -53,7 +53,11 @@ attempting transitions or FCPXML.
 - [x] `crates/hollywood-nle`: golden-file test harness
 - [x] FCP7 **xmeml** writer — multi-track, hard cuts (implemented; golden-file
       regression harness only — Premiere/Resolve import not yet validated)
-- [ ] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
+- [x] **FCPXML** writer — Final Cut / Resolve, explicit audio channel sources
+      (implemented; golden-file regression harness only — Final Cut/Resolve
+      import not yet validated) —
+      [#37](https://github.com/dataclique/hollywood/issues/37)
+      ([#38](https://github.com/dataclique/hollywood/pull/38))
 - [ ] Audio cross-fade transitions (separate, validated against real imports) —
       [#31](https://github.com/dataclique/hollywood/issues/31)
 - [ ] Optional `.otio` export via native `serde_json` against a pinned schema
