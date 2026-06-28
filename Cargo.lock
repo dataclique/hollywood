@@ -1947,6 +1947,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "hollywood-assemble"
+version = "0.1.0"
+dependencies = [
+ "hollywood-timeline",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "hollywood-detect"
 version = "0.1.0"
 dependencies = [
