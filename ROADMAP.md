@@ -65,7 +65,10 @@ attempting transitions or FCPXML.
       ([#52](https://github.com/dataclique/hollywood/pull/52))
 - [ ] Audio cross-fade — **FCPXML** (Final Cut / Resolve), validated against a
       real import — [#31](https://github.com/dataclique/hollywood/issues/31)
-- [ ] Optional `.otio` export via native `serde_json` against a pinned schema
+- [x] Optional `.otio` (OpenTimelineIO) export via native `serde_json` against
+      the pinned OTIO schema —
+      [#53](https://github.com/dataclique/hollywood/issues/53)
+      ([#54](https://github.com/dataclique/hollywood/pull/54))
 
 ## Media I/O
 

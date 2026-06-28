@@ -1,0 +1,191 @@
+{
+  "OTIO_SCHEMA": "Timeline.1",
+  "name": "demo",
+  "tracks": {
+    "OTIO_SCHEMA": "Stack.1",
+    "children": [
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.1",
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 60
+                },
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 0
+                }
+              },
+              "target_url": "a.mov"
+            },
+            "name": "intro",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 90
+              },
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 60
+              }
+            }
+          },
+          {
+            "OTIO_SCHEMA": "Gap.1",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 30
+              },
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 0
+              }
+            }
+          },
+          {
+            "OTIO_SCHEMA": "Clip.1",
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 60
+                },
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 0
+                }
+              },
+              "target_url": "b.mov"
+            },
+            "name": "outro",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 120
+              },
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 300
+              }
+            }
+          }
+        ],
+        "kind": "Video",
+        "source_range": null
+      },
+      {
+        "OTIO_SCHEMA": "Track.1",
+        "children": [
+          {
+            "OTIO_SCHEMA": "Clip.1",
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 60
+                },
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 0
+                }
+              },
+              "target_url": "vo.wav"
+            },
+            "name": "take-1",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 60
+              },
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 0
+              }
+            }
+          },
+          {
+            "OTIO_SCHEMA": "Transition.1",
+            "in_offset": {
+              "OTIO_SCHEMA": "RationalTime.1",
+              "rate": 30,
+              "value": 15
+            },
+            "out_offset": {
+              "OTIO_SCHEMA": "RationalTime.1",
+              "rate": 30,
+              "value": 15
+            },
+            "transition_type": "SMPTE_Dissolve"
+          },
+          {
+            "OTIO_SCHEMA": "Clip.1",
+            "media_reference": {
+              "OTIO_SCHEMA": "ExternalReference.1",
+              "available_range": {
+                "OTIO_SCHEMA": "TimeRange.1",
+                "duration": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 60
+                },
+                "start_time": {
+                  "OTIO_SCHEMA": "RationalTime.1",
+                  "rate": 1,
+                  "value": 0
+                }
+              },
+              "target_url": "vo.wav"
+            },
+            "name": "take-2",
+            "source_range": {
+              "OTIO_SCHEMA": "TimeRange.1",
+              "duration": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 60
+              },
+              "start_time": {
+                "OTIO_SCHEMA": "RationalTime.1",
+                "rate": 30,
+                "value": 90
+              }
+            }
+          }
+        ],
+        "kind": "Audio",
+        "source_range": null
+      }
+    ],
+    "name": "tracks",
+    "source_range": null
+  }
+}
