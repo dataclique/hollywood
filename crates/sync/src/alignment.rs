@@ -5,6 +5,11 @@
 //! the signals' spectra. Both signals are zero-padded to at least their combined
 //! length so the circular correlation the FFT yields equals the linear one.
 //!
+//! [`CorrelationMethod`] selects how the cross-power spectrum is weighted before
+//! the inverse transform: plain cross-correlation, or the Phase Transform
+//! ([`CorrelationMethod::Phat`]) which whitens every bin to unit magnitude for a
+//! sharp, amplitude-invariant peak on spectrally-colored material.
+//!
 //! Valid lags run from `-(reference_len - 1)` to `target_len - 1`, so the peak's
 //! buffer index maps to a lag by length, not by a fixed midpoint: indices below
 //! `target_len` are non-negative lags (`target` starts later); indices in the
@@ -16,6 +21,19 @@ use realfft::RealToComplex;
 use realfft::num_complex::Complex;
 
 use crate::error::SyncError;
+
+/// How the cross-power spectrum is weighted before the inverse transform.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CorrelationMethod {
+    /// Plain cross-correlation `conj(R)·T`. The peak's shape follows the
+    /// signals' autocorrelation; simple and fast, but the finite-overlap
+    /// envelope and amplitude differences can bias or blunt it.
+    CrossCorrelation,
+    /// Phase Transform (GCC-PHAT): whiten each bin to unit magnitude, keeping
+    /// only phase. The peak becomes a sharp, amplitude-invariant impulse,
+    /// robust to colored spectra — at the cost of amplifying empty bins' noise.
+    Phat,
+}
 
 /// How far `target` lags `reference`: positive means `target` starts later,
 /// negative means it starts earlier.
@@ -37,8 +55,8 @@ impl SyncOffset {
     }
 }
 
-/// Align `target` to `reference` (both mono, at `rate`) by cross-correlation,
-/// returning how far `target` lags `reference`.
+/// Align `target` to `reference` (both mono, at `rate`) by cross-correlation
+/// under `method`, returning how far `target` lags `reference`.
 ///
 /// # Errors
 ///
@@ -46,7 +64,12 @@ impl SyncOffset {
 /// [`SyncError::SignalTooLong`] if their combined length is unrepresentable,
 /// [`SyncError::Fft`] if the transform fails, and [`SyncError::NoPeak`] if the
 /// signals are silent or uncorrelated (no positive correlation peak).
-pub fn align(reference: &[f32], target: &[f32], rate: SampleRate) -> Result<SyncOffset, SyncError> {
+pub fn align(
+    reference: &[f32],
+    target: &[f32],
+    rate: SampleRate,
+    method: CorrelationMethod,
+) -> Result<SyncOffset, SyncError> {
     if reference.is_empty() || target.is_empty() {
         return Err(SyncError::EmptySignal);
     }
@@ -67,14 +90,19 @@ pub fn align(reference: &[f32], target: &[f32], rate: SampleRate) -> Result<Sync
     let reference_spectrum = spectrum(forward.as_ref(), reference)?;
     let target_spectrum = spectrum(forward.as_ref(), target)?;
 
-    // Cross-power spectrum conj(R)·T; its inverse transform is the correlation.
+    // Cross-power spectrum conj(R)·T, optionally whitened; its inverse transform
+    // is the correlation.
     let mut cross = forward.make_output_vec();
     for ((slot, &r), &t) in cross
         .iter_mut()
         .zip(&reference_spectrum)
         .zip(&target_spectrum)
     {
-        *slot = r.conj() * t;
+        let cross_power = r.conj() * t;
+        *slot = match method {
+            CorrelationMethod::CrossCorrelation => cross_power,
+            CorrelationMethod::Phat => whiten(cross_power),
+        };
     }
     // The C2R transform requires the DC and Nyquist bins to be purely real; for
     // real inputs they already are, bar floating-point dust.
@@ -98,6 +126,17 @@ pub fn align(reference: &[f32], target: &[f32], rate: SampleRate) -> Result<Sync
         samples: lag_from_index(peak, fft_len, reference.len(), target.len())?,
         rate,
     })
+}
+
+/// Whiten a cross-power bin to unit magnitude (keep phase only). An empty bin
+/// carries no phase, so it stays zero rather than amplifying to unit noise.
+fn whiten(bin: Complex<f32>) -> Complex<f32> {
+    let magnitude = bin.norm();
+    if magnitude > f32::EPSILON {
+        bin.unscale(magnitude)
+    } else {
+        Complex::default()
+    }
 }
 
 /// The spectrum of `signal` zero-padded to the transform's length.
@@ -177,7 +216,13 @@ mod tests {
         let reference = with_pattern(1_000, 100, &PATTERN);
         let target = with_pattern(1_000, 130, &PATTERN);
 
-        let offset = align(&reference, &target, rate()).unwrap();
+        let offset = align(
+            &reference,
+            &target,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), 30);
         // Concrete rational so a broken conversion cannot pass: 30 / 48000 s.
         assert_eq!(offset.seconds(), Seconds::new(30, 48_000).unwrap());
@@ -189,14 +234,26 @@ mod tests {
         let reference = with_pattern(1_000, 130, &PATTERN);
         let target = with_pattern(1_000, 100, &PATTERN);
 
-        let offset = align(&reference, &target, rate()).unwrap();
+        let offset = align(
+            &reference,
+            &target,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), -30);
     }
 
     #[test]
     fn identical_signals_have_zero_offset() {
         let signal = with_pattern(1_000, 200, &PATTERN);
-        let offset = align(&signal, &signal, rate()).unwrap();
+        let offset = align(
+            &signal,
+            &signal,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), 0);
     }
 
@@ -207,7 +264,13 @@ mod tests {
         let target = with_pattern(300, 0, &PATTERN);
 
         // reference feature at 500, target feature at 0 -> target leads by 500.
-        let offset = align(&reference, &target, rate()).unwrap();
+        let offset = align(
+            &reference,
+            &target,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), -500);
     }
 
@@ -218,7 +281,13 @@ mod tests {
         let reference = with_pattern(10, 0, &PATTERN);
         let target = with_pattern(1_000, 990, &PATTERN);
 
-        let offset = align(&reference, &target, rate()).unwrap();
+        let offset = align(
+            &reference,
+            &target,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), 990);
     }
 
@@ -228,7 +297,13 @@ mod tests {
         let reference = with_pattern(1_000, 990, &PATTERN);
         let target = with_pattern(10, 0, &PATTERN);
 
-        let offset = align(&reference, &target, rate()).unwrap();
+        let offset = align(
+            &reference,
+            &target,
+            rate(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
         assert_eq!(offset.samples(), -990);
     }
 
@@ -236,7 +311,12 @@ mod tests {
     fn silent_signals_have_no_peak() {
         let silence = vec![0.0_f32; 1_000];
         assert!(matches!(
-            align(&silence, &silence, rate()),
+            align(
+                &silence,
+                &silence,
+                rate(),
+                CorrelationMethod::CrossCorrelation
+            ),
             Err(SyncError::NoPeak)
         ));
     }
@@ -245,7 +325,7 @@ mod tests {
     fn empty_reference_is_an_error() {
         let target = with_pattern(100, 0, &PATTERN);
         assert!(matches!(
-            align(&[], &target, rate()),
+            align(&[], &target, rate(), CorrelationMethod::CrossCorrelation),
             Err(SyncError::EmptySignal)
         ));
     }
@@ -254,7 +334,7 @@ mod tests {
     fn empty_target_is_an_error() {
         let reference = with_pattern(100, 0, &PATTERN);
         assert!(matches!(
-            align(&reference, &[], rate()),
+            align(&reference, &[], rate(), CorrelationMethod::CrossCorrelation),
             Err(SyncError::EmptySignal)
         ));
     }
@@ -267,6 +347,57 @@ mod tests {
         assert!(matches!(
             lag_from_index(usize::MAX, usize::MAX, 1, 1),
             Err(SyncError::SignalTooLong)
+        ));
+    }
+
+    #[test]
+    fn phat_recovers_the_same_offsets_as_cross_correlation() {
+        // Positive and asymmetric large lags both decode correctly under PHAT.
+        let reference = with_pattern(1_000, 100, &PATTERN);
+        let target = with_pattern(1_000, 130, &PATTERN);
+        assert_eq!(
+            align(&reference, &target, rate(), CorrelationMethod::Phat)
+                .unwrap()
+                .samples(),
+            30
+        );
+
+        let short_reference = with_pattern(10, 0, &PATTERN);
+        let long_target = with_pattern(1_000, 990, &PATTERN);
+        assert_eq!(
+            align(
+                &short_reference,
+                &long_target,
+                rate(),
+                CorrelationMethod::Phat
+            )
+            .unwrap()
+            .samples(),
+            990
+        );
+    }
+
+    #[test]
+    fn phat_offset_is_amplitude_invariant() {
+        // Whitening removes magnitude, so scaling a signal cannot change the
+        // result — the offset is identical regardless of the target's gain.
+        let reference = with_pattern(1_000, 100, &PATTERN);
+        let quiet = with_pattern(1_000, 130, &PATTERN);
+        let loud: Vec<f32> = quiet.iter().map(|&value| value * 1_000.0).collect();
+
+        let quiet_offset = align(&reference, &quiet, rate(), CorrelationMethod::Phat).unwrap();
+        let loud_offset = align(&reference, &loud, rate(), CorrelationMethod::Phat).unwrap();
+
+        assert_eq!(quiet_offset, loud_offset);
+        assert_eq!(quiet_offset.samples(), 30);
+    }
+
+    #[test]
+    fn phat_silent_signals_have_no_peak() {
+        let silence = vec![0.0_f32; 1_000];
+        assert!(matches!(
+            align(&silence, &silence, rate(), CorrelationMethod::Phat),
+            Err(SyncError::NoPeak)
         ));
     }
 }

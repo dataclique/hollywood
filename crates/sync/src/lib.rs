@@ -14,5 +14,5 @@
 mod alignment;
 mod error;
 
-pub use alignment::{SyncOffset, align};
+pub use alignment::{CorrelationMethod, SyncOffset, align};
 pub use error::SyncError;
