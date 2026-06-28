@@ -10,6 +10,10 @@ when new concepts appear (see [AGENTS.md](../AGENTS.md)).
   job. The opposite of the _creative edit_, which stays with the human.
 - **Dead air** — stretches of footage with no useful content: silence or
   non-speech (room tone, pauses). What Hollywood trims.
+- **Keep / cut regions** — the spans of a take to retain vs drop. Silence
+  detection (crate `hollywood-detect`) splits a recording into **keep regions**
+  (speech, padded so onsets and tails are not clipped) and the complementary
+  **cut regions** (dead air); the assembler trims to the keep regions.
 - **Rough assembly / rough cut** — the trimmed, synced, roughly-ordered timeline
   Hollywood exports as a starting point. Not a finished edit.
 
@@ -73,12 +77,18 @@ when new concepts appear (see [AGENTS.md](../AGENTS.md)).
 - **Silence detection** — energy-based detection of quiet regions
   (**RMS**/**peak** gating over short windows), complementary to VAD.
 - **RMS** — root-mean-square, a measure of average signal energy in a window.
+- **dBFS** — decibels relative to full scale, where `0 dBFS` is the maximum
+  sample amplitude (`1.0`). Silence thresholds are negative (e.g. `-40 dBFS`);
+  the gate labels a window silent when its RMS falls below the threshold.
 - **Cross-correlation** — sliding-dot-product similarity of two signals; its
   peak gives the time offset that best aligns them. Hollywood's audio-sync
   primitive, computed via FFT (`rustfft`/`realfft`).
 - **GCC-PHAT** — Generalized Cross-Correlation with Phase Transform: cross-
   correlation with spectral whitening, robust for room-mic arrays but prone to
   spurious peaks at low SNR. Opt-in, not the default.
+- **Sync offset** — the signed offset (in samples / rational time) by which one
+  recording lags another, recovered from the correlation peak so multi-source
+  clips can sit on a shared timebase. Positive means the target starts later.
 - **Drift** — gradual clock divergence between two recording devices, so a
   single fixed offset won't keep them aligned over a long take. Needs a
   piecewise/linear time map.
@@ -124,6 +134,18 @@ exported as native keyframed transforms
   frame, from the activity map.
 - **Ken Burns** — a slow, steady zoom/pan across an otherwise static shot; here,
   auto-applied to long, low-activity clips as a keyframed transform.
+
+## Pipeline
+
+The staged run that drives footage to an export (crate `hollywood-pipeline`).
+
+- **Pipeline** — the staged run that turns footage into an export, one **stage**
+  at a time: **probe → detect → sync → assemble → export**. Stages run in order
+  and fail-fast, behind an abstract job interface so the durable backend can
+  change ([ADR 0004](../adrs/0004-apalis-pipeline.md)).
+- **Progress channel** — Hollywood's own run-progress signal (a
+  `tokio::sync::watch`), separate from apalis's job-state tracking, that the
+  desktop app and CLI render. apalis tracks _job state_, not percent-complete.
 
 ## Build & tooling
 
