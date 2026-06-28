@@ -10,9 +10,13 @@
 //! is `O(n log n)` rather than the `O(n²)` of a direct sum. Like the detector,
 //! it works on raw `&[f32]` samples plus a [`hollywood_timeline::SampleRate`],
 //! so it is independent of how the audio was decoded.
+//!
+//! Callers pick a [`CorrelationMethod`]: [`CorrelationMethod::CrossCorrelation`]
+//! for plain correlation, or [`CorrelationMethod::Phat`] (GCC-PHAT) to whiten the
+//! spectrum for a sharp, amplitude-invariant peak on colored or low-SNR material.
 
 mod alignment;
 mod error;
 
-pub use alignment::{SyncOffset, align};
+pub use alignment::{CorrelationMethod, SyncOffset, align};
 pub use error::SyncError;
