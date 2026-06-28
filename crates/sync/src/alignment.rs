@@ -7,8 +7,8 @@
 //!
 //! [`CorrelationMethod`] selects how the cross-power spectrum is weighted before
 //! the inverse transform: plain cross-correlation, or the Phase Transform
-//! ([`CorrelationMethod::Phat`]) which whitens every bin to unit magnitude for a
-//! sharp, amplitude-invariant peak on spectrally-colored material.
+//! ([`CorrelationMethod::Phat`]) which whitens the spectrum toward unit magnitude
+//! for a sharp, amplitude-invariant peak on spectrally-colored material.
 //!
 //! Valid lags run from `-(reference_len - 1)` to `target_len - 1`, so the peak's
 //! buffer index maps to a lag by length, not by a fixed midpoint: indices below
@@ -29,9 +29,10 @@ pub enum CorrelationMethod {
     /// signals' autocorrelation; simple and fast, but the finite-overlap
     /// envelope and amplitude differences can bias or blunt it.
     CrossCorrelation,
-    /// Phase Transform (GCC-PHAT): whiten each bin to unit magnitude, keeping
-    /// only phase. The peak becomes a sharp, amplitude-invariant impulse,
-    /// robust to colored spectra — at the cost of amplifying empty bins' noise.
+    /// Phase Transform (GCC-PHAT): whiten the spectrum toward unit magnitude,
+    /// regularized so dominant bins keep their phase while weaker bins stay
+    /// suppressed. The peak becomes a sharp, amplitude-invariant impulse, robust
+    /// to colored spectra.
     Phat,
 }
 
@@ -90,19 +91,18 @@ pub fn align(
     let reference_spectrum = spectrum(forward.as_ref(), reference)?;
     let target_spectrum = spectrum(forward.as_ref(), target)?;
 
-    // Cross-power spectrum conj(R)·T, optionally whitened; its inverse transform
-    // is the correlation.
+    // Cross-power spectrum conj(R)·T; its inverse transform is the correlation.
+    // PHAT additionally whitens it toward unit magnitude.
     let mut cross = forward.make_output_vec();
     for ((slot, &r), &t) in cross
         .iter_mut()
         .zip(&reference_spectrum)
         .zip(&target_spectrum)
     {
-        let cross_power = r.conj() * t;
-        *slot = match method {
-            CorrelationMethod::CrossCorrelation => cross_power,
-            CorrelationMethod::Phat => whiten(cross_power),
-        };
+        *slot = r.conj() * t;
+    }
+    if method == CorrelationMethod::Phat {
+        whiten_spectrum(&mut cross);
     }
     // The C2R transform requires the DC and Nyquist bins to be purely real; for
     // real inputs they already are, bar floating-point dust.
@@ -128,14 +128,27 @@ pub fn align(
     })
 }
 
-/// Whiten a cross-power bin to unit magnitude (keep phase only). An empty bin
-/// carries no phase, so it stays zero rather than amplifying to unit noise.
-fn whiten(bin: Complex<f32>) -> Complex<f32> {
-    let magnitude = bin.norm();
-    if magnitude > f32::EPSILON {
-        bin.unscale(magnitude)
-    } else {
-        Complex::default()
+/// PHAT denominator regularization, as a fraction of the peak cross-power
+/// magnitude. Bins far weaker than this fraction of the peak stay proportionally
+/// suppressed rather than being whitened to unit magnitude, which bounds noise
+/// amplification on leakage and near-silent bins and keeps the transform scale-
+/// invariant. Set to 1% as a conservative floor; exposing it per call is a
+/// follow-up if tuning proves necessary.
+const PHAT_REGULARIZATION: f32 = 0.01;
+
+/// Whiten the cross-power spectrum toward unit magnitude (the Phase Transform).
+/// Each bin is divided by its magnitude plus a floor relative to the peak, so
+/// dominant bins approach unit phase while weaker bins stay proportionally
+/// suppressed — bounded amplification, and scale-invariant because the floor
+/// tracks the spectrum. An all-zero spectrum is left untouched.
+fn whiten_spectrum(cross: &mut [Complex<f32>]) {
+    let peak = cross.iter().map(|bin| bin.norm()).fold(0.0_f32, f32::max);
+    if peak <= 0.0 {
+        return;
+    }
+    let floor = PHAT_REGULARIZATION * peak;
+    for bin in cross.iter_mut() {
+        *bin = bin.unscale(bin.norm() + floor);
     }
 }
 
@@ -352,44 +365,60 @@ mod tests {
 
     #[test]
     fn phat_recovers_the_same_offsets_as_cross_correlation() {
-        // Positive and asymmetric large lags both decode correctly under PHAT.
-        let reference = with_pattern(1_000, 100, &PATTERN);
-        let target = with_pattern(1_000, 130, &PATTERN);
-        assert_eq!(
-            align(&reference, &target, rate(), CorrelationMethod::Phat)
-                .unwrap()
-                .samples(),
-            30
-        );
-
-        let short_reference = with_pattern(10, 0, &PATTERN);
-        let long_target = with_pattern(1_000, 990, &PATTERN);
-        assert_eq!(
-            align(
-                &short_reference,
-                &long_target,
+        // On clean signals PHAT and plain cross-correlation agree — including the
+        // negative and asymmetric lags the cross-correlation suite covers, which
+        // also guards the sign convention through the whitening step.
+        let cases = [
+            (
+                with_pattern(1_000, 100, &PATTERN),
+                with_pattern(1_000, 130, &PATTERN),
+            ),
+            (
+                with_pattern(1_000, 130, &PATTERN),
+                with_pattern(1_000, 100, &PATTERN),
+            ),
+            (
+                with_pattern(2_000, 500, &PATTERN),
+                with_pattern(300, 0, &PATTERN),
+            ),
+            (
+                with_pattern(10, 0, &PATTERN),
+                with_pattern(1_000, 990, &PATTERN),
+            ),
+            (
+                with_pattern(1_000, 990, &PATTERN),
+                with_pattern(10, 0, &PATTERN),
+            ),
+        ];
+        for (reference, target) in &cases {
+            let plain = align(
+                reference,
+                target,
                 rate(),
-                CorrelationMethod::Phat
+                CorrelationMethod::CrossCorrelation,
             )
-            .unwrap()
-            .samples(),
-            990
-        );
+            .unwrap();
+            let phat = align(reference, target, rate(), CorrelationMethod::Phat).unwrap();
+            assert_eq!(plain.samples(), phat.samples());
+        }
     }
 
     #[test]
     fn phat_offset_is_amplitude_invariant() {
-        // Whitening removes magnitude, so scaling a signal cannot change the
-        // result — the offset is identical regardless of the target's gain.
+        // The relative whitening floor tracks the spectrum, so PHAT is scale-
+        // invariant: scaling the target up or down cannot change the offset.
         let reference = with_pattern(1_000, 100, &PATTERN);
-        let quiet = with_pattern(1_000, 130, &PATTERN);
-        let loud: Vec<f32> = quiet.iter().map(|&value| value * 1_000.0).collect();
+        let base = with_pattern(1_000, 130, &PATTERN);
+        let loud: Vec<f32> = base.iter().map(|&value| value * 1_000.0).collect();
+        let quiet: Vec<f32> = base.iter().map(|&value| value * 0.001).collect();
 
-        let quiet_offset = align(&reference, &quiet, rate(), CorrelationMethod::Phat).unwrap();
+        let base_offset = align(&reference, &base, rate(), CorrelationMethod::Phat).unwrap();
         let loud_offset = align(&reference, &loud, rate(), CorrelationMethod::Phat).unwrap();
+        let quiet_offset = align(&reference, &quiet, rate(), CorrelationMethod::Phat).unwrap();
 
-        assert_eq!(quiet_offset, loud_offset);
-        assert_eq!(quiet_offset.samples(), 30);
+        assert_eq!(base_offset.samples(), 30);
+        assert_eq!(loud_offset, base_offset);
+        assert_eq!(quiet_offset, base_offset);
     }
 
     #[test]
