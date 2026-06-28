@@ -103,6 +103,7 @@ app and CLI drive the same code. Depends on everything above.
 - [x] `crates/hollywood-pipeline` orchestration skeleton: ordered stages,
       fail-fast sequencing, and the own progress channel (apalis tracks state,
       not percent) — [#47](https://github.com/dataclique/hollywood/issues/47)
+      ([#48](https://github.com/dataclique/hollywood/pull/48))
 - [ ] Durable apalis-SQLite backend behind the abstract job interface (tokio
       fallback); WAL + `busy_timeout`
 - [ ] Stage chain: wire probe → detect → sync → assemble IR → export
