@@ -19,6 +19,14 @@ pub enum NleError {
     #[error("xml serialization failed: {0}")]
     Xml(#[from] std::io::Error),
 
+    /// The OTIO JSON serializer failed. Required to satisfy the `Result` of
+    /// `serde_json::to_string_pretty`, but unreachable with the current in-memory
+    /// serialization — a `Value` of integer and string fields written to a
+    /// `Vec<u8>` cannot fail. Kept so a future streaming or file-based writer is
+    /// already covered.
+    #[error("otio json serialization failed: {0}")]
+    Json(#[from] serde_json::Error),
+
     /// The serialized bytes were not valid UTF-8.
     #[error("serialized output was not valid utf-8: {0}")]
     Encoding(#[from] std::string::FromUtf8Error),

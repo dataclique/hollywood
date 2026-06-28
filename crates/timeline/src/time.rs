@@ -88,6 +88,15 @@ impl Seconds {
         self.0.to_f64().unwrap_or(f64::NAN)
     }
 
+    /// The exact `(numerator, denominator)` of this duration in seconds; the
+    /// denominator is always positive (see [`new`](Self::new)). For serializers
+    /// that carry time at an arbitrary rate (e.g. an OTIO `RationalTime`), this
+    /// represents any duration exactly without forcing it onto a frame grid —
+    /// the right form for non-editorial quantities like a probed source length.
+    pub fn as_exact_rational(self) -> (i64, i64) {
+        (*self.0.numer(), *self.0.denom())
+    }
+
     /// `self + rhs`, returning `None` on `i64` overflow instead of panicking.
     pub fn checked_add(self, rhs: Self) -> Option<Self> {
         self.0.checked_add(&rhs.0).map(Self)
@@ -279,6 +288,23 @@ mod tests {
             Seconds::new(i64::MAX, 1).unwrap().checked_to_samples(rate),
             None
         );
+    }
+
+    #[test]
+    fn as_exact_rational_returns_the_reduced_positive_denominator_form() {
+        assert_eq!(Seconds::ZERO.as_exact_rational(), (0, 1));
+        assert_eq!(Seconds::from_secs(60).as_exact_rational(), (60, 1));
+        // A non-frame-aligned source length round-trips exactly.
+        assert_eq!(
+            Seconds::new(1001, 1000).unwrap().as_exact_rational(),
+            (1001, 1000)
+        );
+        // The fraction is reduced and the sign stays on the numerator.
+        assert_eq!(
+            Seconds::new(24_000, 48_000).unwrap().as_exact_rational(),
+            (1, 2)
+        );
+        assert_eq!(Seconds::new(-3, 2).unwrap().as_exact_rational(), (-3, 2));
     }
 
     #[test]
