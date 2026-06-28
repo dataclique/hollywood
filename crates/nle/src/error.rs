@@ -28,7 +28,9 @@ pub enum NleError {
     #[error("non-integer (NTSC) frame rates are not yet supported")]
     UnsupportedFrameRate,
 
-    /// The timeline contains a transition; only hard cuts are supported so far.
-    #[error("transitions are not yet supported")]
+    /// The timeline contains a transition, which the FCPXML exporter does not
+    /// emit yet. The xmeml exporter ([`crate::to_xmeml`]) does emit audio
+    /// cross-fades; FCPXML cross-fade support is tracked separately.
+    #[error("the FCPXML exporter does not yet support transitions")]
     UnsupportedTransition,
 }
