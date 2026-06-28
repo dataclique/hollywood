@@ -11,8 +11,9 @@ pub enum SyncError {
     /// The signals are too long for their combined length to be represented.
     #[error("signal is too long to cross-correlate")]
     SignalTooLong,
-    /// The cross-correlation produced no samples to take a peak from.
-    #[error("cross-correlation produced no peak")]
+    /// The cross-correlation has no positive peak, so the signals are silent or
+    /// uncorrelated and no meaningful offset exists.
+    #[error("signals have no correlation peak")]
     NoPeak,
     /// The underlying FFT failed.
     #[error("FFT failed: {0}")]

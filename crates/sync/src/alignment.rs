@@ -3,9 +3,13 @@
 //! The cross-correlation of two signals peaks at the lag that best aligns them.
 //! Computed via the convolution theorem: `IFFT(conj(R) · T)` where `R`, `T` are
 //! the signals' spectra. Both signals are zero-padded to at least their combined
-//! length so the circular correlation the FFT yields equals the linear one, and
-//! the peak's index maps to the lag (indices past the midpoint are negative
-//! lags that wrapped around).
+//! length so the circular correlation the FFT yields equals the linear one.
+//!
+//! Valid lags run from `-(reference_len - 1)` to `target_len - 1`, so the peak's
+//! buffer index maps to a lag by length, not by a fixed midpoint: indices below
+//! `target_len` are non-negative lags (`target` starts later); indices in the
+//! tail, within `reference_len - 1` of the end, are negative lags that wrapped
+//! around; the zero-padding gap between them holds no valid lag.
 
 use hollywood_timeline::{SampleRate, Seconds};
 use realfft::RealToComplex;
@@ -40,8 +44,8 @@ impl SyncOffset {
 ///
 /// [`SyncError::EmptySignal`] if either signal is empty,
 /// [`SyncError::SignalTooLong`] if their combined length is unrepresentable,
-/// [`SyncError::Fft`] if the transform fails, and [`SyncError::NoPeak`] if no
-/// correlation peak is found.
+/// [`SyncError::Fft`] if the transform fails, and [`SyncError::NoPeak`] if the
+/// signals are silent or uncorrelated (no positive correlation peak).
 pub fn align(reference: &[f32], target: &[f32], rate: SampleRate) -> Result<SyncOffset, SyncError> {
     if reference.is_empty() || target.is_empty() {
         return Err(SyncError::EmptySignal);
@@ -85,8 +89,13 @@ pub fn align(reference: &[f32], target: &[f32], rate: SampleRate) -> Result<Sync
     inverse.process(&mut cross, &mut correlation)?;
 
     let peak = argmax(&correlation).ok_or(SyncError::NoPeak)?;
+    // A non-positive maximum means there is no real correlation (silent or
+    // uncorrelated signals), not a spurious sub-sample offset.
+    if correlation.get(peak).copied().ok_or(SyncError::NoPeak)? <= 0.0 {
+        return Err(SyncError::NoPeak);
+    }
     Ok(SyncOffset {
-        samples: lag_from_index(peak, fft_len)?,
+        samples: lag_from_index(peak, fft_len, reference.len(), target.len())?,
         rate,
     })
 }
@@ -114,12 +123,29 @@ fn argmax(values: &[f32]) -> Option<usize> {
         .map(|(index, _)| index)
 }
 
-/// Map a correlation-buffer index to a signed lag. Indices in the second half
-/// represent negative lags that wrapped around the circular correlation.
-fn lag_from_index(index: usize, fft_len: usize) -> Result<i64, SyncError> {
+/// Map a correlation-buffer index to a signed lag using the signals' lengths.
+///
+/// Valid lags occupy `[0, target_len)` at the buffer's head and
+/// `[-(reference_len - 1), 0)` at its tail; an index in the zero-padding gap
+/// between them corresponds to no real lag and yields [`SyncError::NoPeak`].
+fn lag_from_index(
+    index: usize,
+    fft_len: usize,
+    reference_len: usize,
+    target_len: usize,
+) -> Result<i64, SyncError> {
     let index = i64::try_from(index).map_err(|_| SyncError::SignalTooLong)?;
-    let len = i64::try_from(fft_len).map_err(|_| SyncError::SignalTooLong)?;
-    Ok(if index <= len / 2 { index } else { index - len })
+    let fft_len = i64::try_from(fft_len).map_err(|_| SyncError::SignalTooLong)?;
+    let reference_len = i64::try_from(reference_len).map_err(|_| SyncError::SignalTooLong)?;
+    let target_len = i64::try_from(target_len).map_err(|_| SyncError::SignalTooLong)?;
+
+    if index < target_len {
+        Ok(index)
+    } else if index >= fft_len - (reference_len - 1) {
+        Ok(index - fft_len)
+    } else {
+        Err(SyncError::NoPeak)
+    }
 }
 
 #[cfg(test)]
@@ -153,7 +179,8 @@ mod tests {
 
         let offset = align(&reference, &target, rate()).unwrap();
         assert_eq!(offset.samples(), 30);
-        assert_eq!(offset.seconds(), Seconds::from_samples(30, rate()));
+        // Concrete rational so a broken conversion cannot pass: 30 / 48000 s.
+        assert_eq!(offset.seconds(), Seconds::new(30, 48_000).unwrap());
     }
 
     #[test]
@@ -185,6 +212,36 @@ mod tests {
     }
 
     #[test]
+    fn recovers_large_positive_lag_with_short_reference() {
+        // Short reference, long target, feature near the target's end: the lag
+        // exceeds fft_len/2, which a fixed-midpoint decode would mis-sign.
+        let reference = with_pattern(10, 0, &PATTERN);
+        let target = with_pattern(1_000, 990, &PATTERN);
+
+        let offset = align(&reference, &target, rate()).unwrap();
+        assert_eq!(offset.samples(), 990);
+    }
+
+    #[test]
+    fn recovers_large_negative_lag_with_short_target() {
+        // The mirror case: long reference, short target, large negative lag.
+        let reference = with_pattern(1_000, 990, &PATTERN);
+        let target = with_pattern(10, 0, &PATTERN);
+
+        let offset = align(&reference, &target, rate()).unwrap();
+        assert_eq!(offset.samples(), -990);
+    }
+
+    #[test]
+    fn silent_signals_have_no_peak() {
+        let silence = vec![0.0_f32; 1_000];
+        assert!(matches!(
+            align(&silence, &silence, rate()),
+            Err(SyncError::NoPeak)
+        ));
+    }
+
+    #[test]
     fn empty_reference_is_an_error() {
         let target = with_pattern(100, 0, &PATTERN);
         assert!(matches!(
@@ -199,6 +256,17 @@ mod tests {
         assert!(matches!(
             align(&reference, &[], rate()),
             Err(SyncError::EmptySignal)
+        ));
+    }
+
+    #[test]
+    fn lag_from_unrepresentable_index_is_an_error() {
+        // The one SignalTooLong site testable without allocating: an index that
+        // overflows i64. The two length-arithmetic sites need usize::MAX-sized
+        // buffers and rely on the checked operators instead.
+        assert!(matches!(
+            lag_from_index(usize::MAX, usize::MAX, 1, 1),
+            Err(SyncError::SignalTooLong)
         ));
     }
 }

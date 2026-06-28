@@ -11,8 +11,7 @@
 //! it works on raw `&[f32]` samples plus a [`hollywood_timeline::SampleRate`],
 //! so it is independent of how the audio was decoded.
 
-pub mod alignment;
-
+mod alignment;
 mod error;
 
 pub use alignment::{SyncOffset, align};
