@@ -17,3 +17,4 @@ Filename: `adrs/NNNN-kebab-title.md`. Sections: **Status**, **Context**,
 - [0006 — Audio post-processing renders stems, not NLE-native filters](./0006-audio-post-processing-stems.md)
 - [0007 — Auto-framing emits NLE-native keyframed transforms, not baked video](./0007-auto-framing-native-transforms.md)
 - [0008 — Threading typed data through the pipeline stages](./0008-pipeline-stage-data-threading.md)
+- [0009 — Multi-source ingest, cross-source sync, and multi-track assembly](./0009-multi-source-sync-assembly.md)

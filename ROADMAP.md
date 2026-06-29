@@ -141,6 +141,10 @@ app and CLI drive the same code. Depends on everything above.
       ([#72](https://github.com/dataclique/hollywood/pull/72))
 - [ ] Conform keep regions to whole frames so arbitrary silence-gate windows
       export cleanly (today the window must land clip boundaries on frames)
+- [x] Multi-source threading design — how N sources thread `Sources → Synced →`
+      multi-track `Assembled`, with a union-of-speech cut and a sync anchor
+      ([ADR 0009](./adrs/0009-multi-source-sync-assembly.md)) —
+      [#77](https://github.com/dataclique/hollywood/issues/77)
 - [ ] Multi-source: probe/decode several sources and align them with
       cross-source sync before assembling
 
