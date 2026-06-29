@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use crate::asset::{MediaAsset, MediaSource};
 use crate::error::TimelineError;
 use crate::time::FrameRate;
-use crate::track::{Track, TrackItem, TrackKind};
+use crate::track::{Clip, Track, TrackItem, TrackKind};
 
 /// The position of a track within a [`Timeline`], returned by
 /// [`Timeline::add_track`].
@@ -97,31 +97,43 @@ impl Timeline {
             .iter()
             .map(|asset| (asset.source(), asset))
             .collect();
-        for track in &self.tracks {
+        self.tracks.iter().try_for_each(|track| {
             track.validate()?;
-            for item in track.items() {
-                if let TrackItem::Clip(clip) = item {
-                    let asset = assets_by_source
-                        .get(clip.asset())
-                        .ok_or_else(|| TimelineError::UnknownAsset(clip.asset().clone()))?;
-                    let range = clip.range();
-                    if range.duration().is_zero() {
-                        return Err(TimelineError::EmptyClip);
-                    }
-                    if range.start().is_negative() || range.end() > asset.duration() {
-                        return Err(TimelineError::ClipOutOfAssetBounds);
-                    }
-                    let has_required_stream = match track.kind() {
-                        TrackKind::Video => asset.video().is_some(),
-                        TrackKind::Audio => asset.audio().is_some(),
-                    };
-                    if !has_required_stream {
-                        return Err(TimelineError::TrackAssetStreamMismatch);
-                    }
-                }
-            }
-        }
+            track
+                .items()
+                .iter()
+                .filter_map(TrackItem::as_clip)
+                .try_for_each(|clip| validate_clip(clip, track.kind(), &assets_by_source))
+        })
+    }
+}
+
+/// Validate one clip against its `track`'s kind and the timeline's assets: the
+/// clip references a registered asset, its source range lies within that asset's
+/// duration, and the asset carries the stream the track kind requires.
+fn validate_clip(
+    clip: &Clip,
+    kind: TrackKind,
+    assets_by_source: &HashMap<&MediaSource, &MediaAsset>,
+) -> Result<(), TimelineError> {
+    let asset = assets_by_source
+        .get(clip.asset())
+        .ok_or_else(|| TimelineError::UnknownAsset(clip.asset().clone()))?;
+    let range = clip.range();
+    if range.duration().is_zero() {
+        return Err(TimelineError::EmptyClip);
+    }
+    if range.start().is_negative() || range.end() > asset.duration() {
+        return Err(TimelineError::ClipOutOfAssetBounds);
+    }
+    let has_required_stream = match kind {
+        TrackKind::Video => asset.video().is_some(),
+        TrackKind::Audio => asset.audio().is_some(),
+    };
+    if has_required_stream {
         Ok(())
+    } else {
+        Err(TimelineError::TrackAssetStreamMismatch)
     }
 }
 

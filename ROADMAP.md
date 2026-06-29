@@ -183,6 +183,9 @@ stage).
 - [x] FP-idiom cleanup: imperative push/index loops to iterator combinators —
       [#58](https://github.com/dataclique/hollywood/issues/58)
       ([#59](https://github.com/dataclique/hollywood/pull/59))
+- [x] FP-idiom cleanup: validation/accumulation loops to iterator combinators —
+      [#63](https://github.com/dataclique/hollywood/issues/63)
+      ([#64](https://github.com/dataclique/hollywood/pull/64))
 
 ## Completed: Foundation
 

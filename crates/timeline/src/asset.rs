@@ -52,17 +52,15 @@ impl fmt::Display for MediaSource {
 fn lexically_normalize(path: &Path) -> PathBuf {
     use std::path::Component;
 
-    let mut normalized = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::CurDir => {}
-            other => normalized.push(other),
-        }
-    }
+    let normalized: PathBuf = path
+        .components()
+        .filter(|component| !matches!(component, Component::CurDir))
+        .collect();
     if normalized.as_os_str().is_empty() {
-        normalized.push(Component::CurDir);
+        PathBuf::from(Component::CurDir.as_os_str())
+    } else {
+        normalized
     }
-    normalized
 }
 
 /// How many audio channels a source carries.

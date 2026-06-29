@@ -22,17 +22,17 @@ impl ProbeOutcome {
         match self {
             Self::Pending => "probing…".to_owned(),
             Self::Ready(media) => {
-                let mut parts = Vec::new();
-                if media.video.is_some() {
-                    parts.push("video");
-                }
-                if media.audio.is_some() {
-                    parts.push("audio");
-                }
-                let streams = if parts.is_empty() {
+                let labels: Vec<&str> = [
+                    media.video.is_some().then_some("video"),
+                    media.audio.is_some().then_some("audio"),
+                ]
+                .into_iter()
+                .flatten()
+                .collect();
+                let streams = if labels.is_empty() {
                     "no streams".to_owned()
                 } else {
-                    parts.join(" + ")
+                    labels.join(" + ")
                 };
                 format!("{streams}, {}", format_duration(media.duration))
             }

@@ -89,22 +89,24 @@ pub fn assemble(
     // one another, so overlapping or reversed regions would silently assemble
     // into a cut that duplicates or reorders content. Reject that input here,
     // where the regions are still regions.
-    let mut previous_end = Seconds::ZERO;
-    for (index, region) in keep_regions.iter().enumerate() {
-        if region.duration().is_zero() {
-            return Err(AssembleError::EmptyRegion { index });
-        }
-        if region.start().is_negative() || region.end() > source_duration {
-            return Err(AssembleError::RegionOutsideSource { index });
-        }
-        // The region is within the source, so this catches only a genuine
-        // ordering/overlap problem against the previous region (never a negative
-        // first-region start, already rejected above).
-        if region.start() < previous_end {
-            return Err(AssembleError::RegionsNotAscending { index });
-        }
-        previous_end = region.end();
-    }
+    keep_regions
+        .iter()
+        .enumerate()
+        .try_fold(Seconds::ZERO, |previous_end, (index, region)| {
+            if region.duration().is_zero() {
+                return Err(AssembleError::EmptyRegion { index });
+            }
+            if region.start().is_negative() || region.end() > source_duration {
+                return Err(AssembleError::RegionOutsideSource { index });
+            }
+            // The region is within the source, so this catches only a genuine
+            // ordering/overlap problem against the previous region (never a
+            // negative first-region start, already rejected above).
+            if region.start() < previous_end {
+                return Err(AssembleError::RegionsNotAscending { index });
+            }
+            Ok(region.end())
+        })?;
 
     let mut timeline = Timeline::new(name, frame_rate);
     timeline.add_asset(asset)?;
