@@ -97,11 +97,10 @@ impl HollywoodApp {
             match rx.try_recv() {
                 Ok(batch) => {
                     self.probe_rx = None;
-                    for (offset, entry) in batch.entries.into_iter().enumerate() {
-                        let index = batch.start + offset;
-                        if let Some(slot) = self.footage.get_mut(index) {
-                            *slot = entry;
-                        }
+                    for (slot, entry) in
+                        self.footage.iter_mut().skip(batch.start).zip(batch.entries)
+                    {
+                        *slot = entry;
                     }
                     repaint = true;
                 }
@@ -119,10 +118,11 @@ impl HollywoodApp {
 
     fn start_probe(&mut self, paths: Vec<PathBuf>) {
         let start = self.footage.len();
-        for path in &paths {
-            self.footage
-                .push(FootageEntry::pending(MediaSource::file(path)));
-        }
+        self.footage.extend(
+            paths
+                .iter()
+                .map(|path| FootageEntry::pending(MediaSource::file(path))),
+        );
 
         let (tx, rx) = mpsc::channel();
         self.probe_rx = Some(rx);

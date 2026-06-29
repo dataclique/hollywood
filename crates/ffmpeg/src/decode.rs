@@ -177,14 +177,14 @@ fn append_downmixed(frame: &Audio, samples: &mut Vec<f32>) -> Result<(), MediaEr
     }
     // `u16 -> f32` is exact, so the mean carries no cast precision loss.
     let scale = 1.0 / f32::from(channel_count);
-    for index in 0..count {
+    samples.extend((0..count).map(|index| {
         let sum: f32 = planes
             .iter()
             .filter_map(|plane| plane.get(index))
             .copied()
             .sum();
-        samples.push(sum * scale);
-    }
+        sum * scale
+    }));
     Ok(())
 }
 

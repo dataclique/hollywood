@@ -173,6 +173,9 @@ stage).
 - [x] Glossary catch-up for recent domain terms —
       [#49](https://github.com/dataclique/hollywood/issues/49)
       ([#50](https://github.com/dataclique/hollywood/pull/50))
+- [x] FP-idiom cleanup: imperative push/index loops to iterator combinators —
+      [#58](https://github.com/dataclique/hollywood/issues/58)
+      ([#59](https://github.com/dataclique/hollywood/pull/59))
 
 ## Completed: Foundation
 

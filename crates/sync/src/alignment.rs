@@ -93,14 +93,11 @@ pub fn align(
 
     // Cross-power spectrum conj(R)·T; its inverse transform is the correlation.
     // PHAT additionally whitens it toward unit magnitude.
-    let mut cross = forward.make_output_vec();
-    for ((slot, &r), &t) in cross
-        .iter_mut()
-        .zip(&reference_spectrum)
+    let mut cross: Vec<Complex<f32>> = reference_spectrum
+        .iter()
         .zip(&target_spectrum)
-    {
-        *slot = r.conj() * t;
-    }
+        .map(|(&r, &t)| r.conj() * t)
+        .collect();
     if method == CorrelationMethod::Phat {
         whiten_spectrum(&mut cross);
     }
