@@ -8,10 +8,19 @@
 //! each window in turn, producing a [`DriftMap`] — the offset sampled over time,
 //! from which the assembler can correct drift rather than assume a fixed lag.
 //!
-//! Each window is aligned independently with [`align`](crate::align), so every
-//! window must hold correlatable content; a window over pure silence has no peak
-//! and surfaces [`SyncError::NoPeak`]. The window must also be longer than the
-//! lag it measures, since the two windows cover the same sample span.
+//! Each window is aligned independently. A window with no correlatable content
+//! (dead air) yields no point — it is skipped, so the map is a sparse sampling
+//! over the windows that did correlate and the consumer interpolates across the
+//! gaps. Only if no window correlates at all does the map surface
+//! [`SyncError::NoPeak`].
+//!
+//! Both windows cover the *same* sample span, so each measures the **total** lag
+//! at that point (base offset plus accumulated drift), not the drift increment,
+//! and the window must be longer than that total lag — otherwise the two spans
+//! hold non-overlapping content. For sources started far apart (a large base
+//! offset) that forces a coarse window; correlating against a target span shifted
+//! by a coarse global offset, to measure only the small residual drift, is the
+//! robust refinement and a follow-up.
 
 use std::num::NonZeroUsize;
 
@@ -84,15 +93,17 @@ impl DriftWindow {
 /// aligning each `window` of the recording with `method`.
 ///
 /// Each window of `reference` is aligned against the same span of `target`, so
-/// the offset it reports is the lag local to that window; reading the offsets in
-/// order shows the lag evolving as the clocks drift apart.
+/// each point is the total lag at that window (base offset plus drift); reading
+/// the points in order shows the lag evolving as the clocks drift apart. Windows
+/// with no correlatable content are skipped, so the map may be sparser than the
+/// number of windows that fit.
 ///
 /// # Errors
 ///
 /// [`SyncError::EmptySignal`] if either signal is empty,
-/// [`SyncError::SignalShorterThanWindow`] if neither holds one full window, and
-/// any error from the per-window [`align`](crate::align) — notably
-/// [`SyncError::NoPeak`] for a window with no correlatable content.
+/// [`SyncError::SignalShorterThanWindow`] if neither holds one full window,
+/// [`SyncError::NoPeak`] if windows fit but none correlated, and any genuine
+/// per-window error from [`align`](crate::align), e.g. [`SyncError::Fft`].
 pub fn drift_map(
     reference: &[f32],
     target: &[f32],
@@ -107,15 +118,27 @@ pub fn drift_map(
     let length = window.length.get();
     let hop = window.hop.get();
     let mut points = Vec::new();
+    let mut any_window = false;
     let mut start = 0_usize;
     while let Some((reference_window, target_window)) = windows_at(reference, target, start, length)
     {
-        let offset = align(reference_window, target_window, rate, method)?;
-        let at = Seconds::from_samples(
-            i64::try_from(start).map_err(|_| SyncError::SignalTooLong)?,
-            rate,
-        );
-        points.push(DriftPoint { at, offset });
+        any_window = true;
+        // A window over dead air (or otherwise uncorrelatable content) yields no
+        // measurement: skip it and carry on, rather than abort the whole map. A
+        // drift map is a sparse sampling and raw footage is full of pauses, so a
+        // silent window is the norm, not a failure — the consumer interpolates
+        // across the gaps. Genuine errors (FFT, overflow) still propagate.
+        match align(reference_window, target_window, rate, method) {
+            Ok(offset) => {
+                let at = Seconds::from_samples(
+                    i64::try_from(start).map_err(|_| SyncError::SignalTooLong)?,
+                    rate,
+                );
+                points.push(DriftPoint { at, offset });
+            }
+            Err(SyncError::NoPeak) => {}
+            Err(other) => return Err(other),
+        }
 
         let Some(next) = start.checked_add(hop) else {
             break;
@@ -123,8 +146,11 @@ pub fn drift_map(
         start = next;
     }
 
-    if points.is_empty() {
+    if !any_window {
         return Err(SyncError::SignalShorterThanWindow);
+    }
+    if points.is_empty() {
+        return Err(SyncError::NoPeak);
     }
     Ok(DriftMap { points })
 }
@@ -210,6 +236,24 @@ mod tests {
     }
 
     #[test]
+    fn shrinking_lag_shows_up_as_drift() {
+        // The mirror case: the target's clock runs fast, so the lag shrinks
+        // 80 -> 70 -> 60 -> 50 across the recording — drift is directional.
+        let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
+        let target = with_features(8_000, &[1_080, 3_070, 5_060, 7_050]);
+
+        let map = drift_map(
+            &reference,
+            &target,
+            rate(),
+            window(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
+        assert_eq!(offsets(&map), vec![80, 70, 60, 50]);
+    }
+
+    #[test]
     fn points_carry_ascending_window_start_times() {
         let reference = with_features(6_000, &[1_000, 3_000, 5_000]);
         let target = with_features(6_000, &[1_100, 3_100, 5_100]);
@@ -248,7 +292,8 @@ mod tests {
             CorrelationMethod::CrossCorrelation,
         )
         .unwrap();
-        // Three windows tiled by the hop: [0,2000), [1000,3000), [2000,4000).
+        // Three overlapping windows advanced by the hop: [0,2000), [1000,3000),
+        // [2000,4000) — each independently resolves the +20 offset.
         let starts: Vec<Seconds> = map.points().iter().map(|p| p.at()).collect();
         assert_eq!(
             starts,
@@ -258,6 +303,7 @@ mod tests {
                 Seconds::from_samples(2_000, rate()),
             ]
         );
+        assert_eq!(offsets(&map), vec![20, 20, 20]);
     }
 
     #[test]
@@ -298,14 +344,34 @@ mod tests {
     }
 
     #[test]
-    fn a_silent_window_has_no_peak() {
-        // The first window is silent; align surfaces NoPeak rather than a guess.
+    fn a_silent_window_is_skipped_not_fatal() {
+        // The first window [0, 2000) is silent; the second [2000, 4000) holds a
+        // feature. The silent window yields no point but does not abort the map —
+        // the correlated window is still measured.
         let reference = with_features(4_000, &[2_500]);
         let target = with_features(4_000, &[2_550]);
+        let map = drift_map(
+            &reference,
+            &target,
+            rate(),
+            window(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
+        assert_eq!(map.points().len(), 1);
+        assert_eq!(map.points()[0].at(), Seconds::from_samples(2_000, rate()));
+        assert_eq!(offsets(&map), vec![50]);
+    }
+
+    #[test]
+    fn all_silent_windows_yield_no_peak() {
+        // Windows fit but none correlate, so the map has no points — surfaced as
+        // NoPeak, distinct from "no window fit at all" (SignalShorterThanWindow).
+        let silence = vec![0.0_f32; 4_000];
         assert!(matches!(
             drift_map(
-                &reference,
-                &target,
+                &silence,
+                &silence,
                 rate(),
                 window(),
                 CorrelationMethod::CrossCorrelation
