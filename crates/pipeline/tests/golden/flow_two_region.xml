@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmeml version="5">
+  <sequence>
+    <name>rough cut</name>
+    <rate>
+      <timebase>30</timebase>
+      <ntsc>FALSE</ntsc>
+    </rate>
+    <media>
+      <audio>
+        <track>
+          <clipitem>
+            <name>take.wav</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>0</start>
+            <end>3</end>
+            <in>3</in>
+            <out>6</out>
+            <file id="file-1">
+              <name>take.wav</name>
+              <pathurl>take.wav</pathurl>
+            </file>
+          </clipitem>
+          <clipitem>
+            <name>take.wav</name>
+            <rate>
+              <timebase>30</timebase>
+              <ntsc>FALSE</ntsc>
+            </rate>
+            <start>3</start>
+            <end>6</end>
+            <in>9</in>
+            <out>12</out>
+            <file id="file-1">
+              <name>take.wav</name>
+              <pathurl>take.wav</pathurl>
+            </file>
+          </clipitem>
+        </track>
+      </audio>
+    </media>
+  </sequence>
+</xmeml>

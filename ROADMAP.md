@@ -131,8 +131,13 @@ app and CLI drive the same code. Depends on everything above.
       ([ADR 0008](./adrs/0008-pipeline-stage-data-threading.md)) —
       [#65](https://github.com/dataclique/hollywood/issues/65)
       ([#66](https://github.com/dataclique/hollywood/pull/66))
-- [ ] Stage chain: wire probe → detect → sync → assemble IR → export (the
-      `assemble` building block now exists; the data-threaded wiring does not)
+- [x] Stage chain (in-memory): the typed-state `flow` threads detect → sync →
+      assemble → export over decoded audio, with progress and fail-fast (ADR
+      0008) — [#69](https://github.com/dataclique/hollywood/issues/69)
+      ([#70](https://github.com/dataclique/hollywood/pull/70))
+- [ ] Stage chain front: the probe → decode transforms that produce the `flow`'s
+      `Decoded` entry state from source files, plus multi-source cross-source
+      sync and conforming keep regions to whole frames for the exporters
 
 ## Desktop app + CLI
 

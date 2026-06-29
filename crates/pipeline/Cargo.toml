@@ -8,6 +8,10 @@ repository.workspace = true
 description = "Pipeline orchestration: run the probe → detect → sync → assemble → export stages in order with progress reporting."
 
 [dependencies]
+hollywood-assemble.workspace = true
+hollywood-detect.workspace = true
+hollywood-nle.workspace = true
+hollywood-timeline.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 
