@@ -73,6 +73,19 @@ impl Seconds {
         (self.0 * rate.0).round().to_integer()
     }
 
+    /// The largest whole-frame index at `rate` whose start is at or before this
+    /// duration — i.e. this duration floored onto the frame grid. Pairs with
+    /// [`frame_ceil`](Self::frame_ceil) to snap a span out to whole frames.
+    pub fn frame_floor(self, rate: FrameRate) -> i64 {
+        (self.0 * rate.0).floor().to_integer()
+    }
+
+    /// The smallest whole-frame index at `rate` whose start is at or after this
+    /// duration — i.e. this duration ceiled onto the frame grid.
+    pub fn frame_ceil(self, rate: FrameRate) -> i64 {
+        (self.0 * rate.0).ceil().to_integer()
+    }
+
     /// Whether this value is strictly less than zero.
     pub fn is_negative(self) -> bool {
         self.0.is_negative()
@@ -258,6 +271,19 @@ mod tests {
         let rate = FrameRate::whole(24).unwrap();
         assert_eq!(Seconds::from_secs(2).to_frames(rate), 48);
         assert_eq!(Seconds::from_frames(48, rate).to_frames(rate), 48);
+    }
+
+    #[test]
+    fn frame_floor_and_ceil_snap_out_to_whole_frames() {
+        let rate = FrameRate::whole(30).unwrap();
+        // 2.5 frames floors to 2 and ceils to 3.
+        let two_and_a_half = Seconds::new(1, 12).unwrap();
+        assert_eq!(two_and_a_half.frame_floor(rate), 2);
+        assert_eq!(two_and_a_half.frame_ceil(rate), 3);
+        // A value already on a frame floors and ceils to that frame.
+        let exactly_two = Seconds::from_frames(2, rate);
+        assert_eq!(exactly_two.frame_floor(rate), 2);
+        assert_eq!(exactly_two.frame_ceil(rate), 2);
     }
 
     #[test]

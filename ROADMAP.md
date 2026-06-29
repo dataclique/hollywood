@@ -145,6 +145,10 @@ app and CLI drive the same code. Depends on everything above.
       multi-track `Assembled`, with a union-of-speech cut and a sync anchor
       ([ADR 0009](./adrs/0009-multi-source-sync-assembly.md)) —
       [#77](https://github.com/dataclique/hollywood/issues/77)
+- [x] Conform keep regions to whole frames so arbitrary silence-gate windows
+      export cleanly — [#73](https://github.com/dataclique/hollywood/issues/73)
+      ([#74](https://github.com/dataclique/hollywood/pull/74)) (a non-frame
+      source duration still needs conforming — a follow-up)
 - [ ] Multi-source: probe/decode several sources and align them with
       cross-source sync before assembling
 
@@ -156,7 +160,10 @@ The single deliverable a user touches.
 - [x] `egui`/`eframe` (wgpu) shell: file pickers (`rfd` on a worker thread),
       footage list with probe summaries, export target checkboxes, stub progress
       — _in progress_
-- [ ] CLI surface over the same pipeline for batch/headless use
+- [x] CLI surface over the same pipeline for batch/headless use — the `process`
+      command pre-edits a file and writes the NLE exports —
+      [#75](https://github.com/dataclique/hollywood/issues/75)
+      ([#76](https://github.com/dataclique/hollywood/pull/76))
 - [ ] Packaging/notarization per OS with FFmpeg LGPL notices
 
 ## Audio post-processing

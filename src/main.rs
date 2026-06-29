@@ -4,6 +4,8 @@
 use clap::{Parser, Subcommand};
 use tracing_subscriber::EnvFilter;
 
+use hollywood::cli::ProcessArgs;
+
 /// Hollywood — video pre-editing automation.
 #[derive(Debug, Parser)]
 #[command(name = "hollywood", version, about)]
@@ -22,6 +24,8 @@ enum Command {
     Gui,
     /// Initialize subsystems and exit — for CI and headless smoke checks.
     Init,
+    /// Pre-edit a source file and write the exported NLE timelines.
+    Process(ProcessArgs),
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -36,6 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     match cli.command {
         None | Some(Command::Gui) => hollywood_gui::run()?,
         Some(Command::Init) => tracing::info!("hollywood foundation ready"),
+        Some(Command::Process(args)) => hollywood::cli::run_process(&args)?,
     }
 
     Ok(())
