@@ -531,10 +531,7 @@ fn empty_element(
 }
 
 fn element<'a>(name: &'a str, attrs: &[(&str, String)]) -> BytesStart<'a> {
-    let mut element = BytesStart::new(name);
-    for (key, value) in attrs {
-        // `push_attribute((&str, &str))` escapes the value itself.
-        element.push_attribute((*key, value.as_str()));
-    }
-    element
+    // `with_attributes` pushes each `(&str, &str)` through `push_attribute`, which
+    // escapes the value itself.
+    BytesStart::new(name).with_attributes(attrs.iter().map(|(key, value)| (*key, value.as_str())))
 }
