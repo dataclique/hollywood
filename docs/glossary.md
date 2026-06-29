@@ -92,6 +92,12 @@ when new concepts appear (see [AGENTS.md](../AGENTS.md)).
 - **Drift** — gradual clock divergence between two recording devices, so a
   single fixed offset won't keep them aligned over a long take. Needs a
   piecewise/linear time map.
+- **Drift map** — the sync offset sampled window-by-window across a recording,
+  so a drifting clock shows as an offset that changes over time. Each window is
+  measured as the small **residual** around a coarse **base** offset (from one
+  whole-take cross-correlation), so sources started far apart need no wider a
+  window than tightly-aligned ones; the consumer interpolates across windows
+  that carry no correlatable content.
 - **Frame rate / sample rate / channel layout** — video frames per second, audio
   samples per second, and the arrangement of audio channels (mono/stereo/…).
   Core media-asset properties that must survive into the export.
