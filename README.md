@@ -12,10 +12,16 @@ hand-written XML adapters, `ffmpeg-next` for media I/O, `rustfft` for
 cross-correlation audio sync, RMS/peak + Silero VAD for silence detection, and
 `egui`/`eframe` for the desktop GUI.
 
-> **Status:** foundation in progress. The timeline IR, NLE exporters, and media
-> probe crate are in the tree; the `egui` desktop shell is runnable for picking
-> footage and choosing export targets. Silence detection, sync, pipeline
-> orchestration, and full export wiring land in stacked pull requests. See
+> **Status:** the analysis and export building blocks are in the tree — the
+> timeline IR, both NLE exporters (FCP7 `xmeml`, including audio cross-fades,
+> and FCPXML) plus optional `.otio`, the FFmpeg probe and audio-decode layer,
+> RMS silence detection, audio sync (cross-correlation and GCC-PHAT, with a
+> piecewise drift map for long takes), the `assemble` step that lays keep
+> regions into a trimmed timeline, and the pipeline-orchestration skeleton. The
+> `egui` desktop shell is runnable for picking footage and choosing export
+> targets. Exporters are verified against golden files; native import into
+> Resolve/Premiere is not yet validated. Still to come: wiring the stages into
+> one end-to-end pipeline, Silero VAD, a durable job backend, and the CLI. See
 > [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
 
 ## Running

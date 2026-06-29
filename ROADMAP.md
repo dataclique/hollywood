@@ -186,6 +186,9 @@ stage).
 - [x] FP-idiom cleanup: validation/accumulation loops to iterator combinators —
       [#63](https://github.com/dataclique/hollywood/issues/63)
       ([#64](https://github.com/dataclique/hollywood/pull/64))
+- [x] README status section brought in lockstep with the merged crates —
+      [#67](https://github.com/dataclique/hollywood/issues/67)
+      ([#68](https://github.com/dataclique/hollywood/pull/68))
 
 ## Completed: Foundation
 
