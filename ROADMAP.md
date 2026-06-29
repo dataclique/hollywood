@@ -154,7 +154,10 @@ The single deliverable a user touches.
 - [x] `egui`/`eframe` (wgpu) shell: file pickers (`rfd` on a worker thread),
       footage list with probe summaries, export target checkboxes, stub progress
       — _in progress_
-- [ ] CLI surface over the same pipeline for batch/headless use
+- [x] CLI surface over the same pipeline for batch/headless use — the `process`
+      command pre-edits a file and writes the NLE exports —
+      [#75](https://github.com/dataclique/hollywood/issues/75)
+      ([#76](https://github.com/dataclique/hollywood/pull/76))
 - [ ] Packaging/notarization per OS with FFmpeg LGPL notices
 
 ## Audio post-processing

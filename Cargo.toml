@@ -68,6 +68,7 @@ hollywood-detect.path = "crates/detect"
 hollywood-ffmpeg.path = "crates/ffmpeg"
 hollywood-gui.path = "crates/gui"
 hollywood-nle.path = "crates/nle"
+hollywood-pipeline.path = "crates/pipeline"
 hollywood-sync.path = "crates/sync"
 hollywood-timeline.path = "crates/timeline"
 
@@ -92,7 +93,11 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+hollywood-detect.workspace = true
+hollywood-ffmpeg.workspace = true
 hollywood-gui.workspace = true
+hollywood-pipeline.workspace = true
+hollywood-timeline.workspace = true
 
 [lints]
 workspace = true

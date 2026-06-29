@@ -17,18 +17,20 @@ cross-correlation audio sync, RMS/peak + Silero VAD for silence detection, and
 > and FCPXML) plus optional `.otio`, the FFmpeg probe and audio-decode layer,
 > RMS silence detection, audio sync (cross-correlation and GCC-PHAT, with a
 > piecewise drift map for long takes), the `assemble` step that lays keep
-> regions into a trimmed timeline, and the pipeline-orchestration skeleton. The
-> `egui` desktop shell is runnable for picking footage and choosing export
-> targets. Exporters are verified against golden files; native import into
-> Resolve/Premiere is not yet validated. Still to come: wiring the stages into
-> one end-to-end pipeline, Silero VAD, a durable job backend, and the CLI. See
-> [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
+> regions into a trimmed timeline, and a pipeline that threads probe → detect →
+> sync → assemble → export, runnable end-to-end from one source file via the
+> `process` CLI command. The `egui` desktop shell is runnable for picking
+> footage and choosing export targets (not yet wired to the pipeline). Exporters
+> are verified against golden files; native import into Resolve/Premiere is not
+> yet validated. Still to come: Silero VAD, multi-source sync, and a durable job
+> backend. See [`SPEC.md`](./SPEC.md) and [`ROADMAP.md`](./ROADMAP.md).
 
 ## Running
 
 ```bash
-cargo run              # opens the desktop shell (default)
-cargo run -- init      # headless smoke check for CI
+cargo run                                   # opens the desktop shell (default)
+cargo run -- init                           # headless smoke check for CI
+cargo run -- process <input> <output-dir>   # pre-edit a file, write NLE exports
 ```
 
 ## Development
