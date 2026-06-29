@@ -45,6 +45,14 @@ pub struct SyncOffset {
 }
 
 impl SyncOffset {
+    /// An offset of `samples` at `rate` (positive = `target` lags `reference`).
+    /// [`align`] is the usual source; this constructs one directly — e.g. a
+    /// coarse offset a caller already measured, or one composed from a base plus
+    /// a residual.
+    pub fn from_samples(samples: i64, rate: SampleRate) -> Self {
+        Self { samples, rate }
+    }
+
     /// The offset in samples (positive = `target` lags `reference`).
     pub fn samples(self) -> i64 {
         self.samples

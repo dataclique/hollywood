@@ -11,16 +11,18 @@
 //! Each window is aligned independently. A window with no correlatable content
 //! (dead air) yields no point — it is skipped, so the map is a sparse sampling
 //! over the windows that did correlate and the consumer interpolates across the
-//! gaps. Only if no window correlates at all does the map surface
-//! [`SyncError::NoPeak`].
+//! gaps. Only if windows were correlated but none produced a peak does the map
+//! surface [`SyncError::NoPeak`].
 //!
-//! Both windows cover the *same* sample span, so each measures the **total** lag
-//! at that point (base offset plus accumulated drift), not the drift increment,
-//! and the window must be longer than that total lag — otherwise the two spans
-//! hold non-overlapping content. For sources started far apart (a large base
-//! offset) that forces a coarse window; correlating against a target span shifted
-//! by a coarse global offset, to measure only the small residual drift, is the
-//! robust refinement and a follow-up.
+//! A caller passes a coarse `base` offset — from a single [`align`](crate::align)
+//! over the whole take — and each window is correlated against the target span
+//! *shifted* by that base, so it measures only the small residual drift; the
+//! point's offset is `base + residual`, the true lag at that window. Because each
+//! window need only span the residual rather than the whole lag, sources started
+//! far apart (a large base offset) need no coarser a window than tightly-aligned
+//! ones. If the base is so inconsistent with the signals' lengths that no
+//! window's shifted span falls within `target`, the map surfaces
+//! [`SyncError::NoWindowInBounds`].
 
 use std::num::NonZeroUsize;
 
@@ -89,25 +91,32 @@ impl DriftWindow {
     }
 }
 
-/// Measure how `target` drifts against `reference` (both mono, at `rate`) by
-/// aligning each `window` of the recording with `method`.
+/// Measure how `target` drifts against `reference` (both mono, at `rate`) around
+/// a coarse `base` offset, aligning each `window` of the recording with `method`.
 ///
-/// Each window of `reference` is aligned against the same span of `target`, so
-/// each point is the total lag at that window (base offset plus drift); reading
-/// the points in order shows the lag evolving as the clocks drift apart. Windows
-/// with no correlatable content are skipped, so the map may be sparser than the
-/// number of windows that fit.
+/// Each reference window is correlated against the target span shifted by `base`,
+/// so it measures the residual drift there; the point's offset is `base` plus
+/// that residual — the true lag at the window. Pass the `base` from a single
+/// [`align`](crate::align) over the whole take. Reading the points in order shows
+/// the lag evolving as the clocks drift apart. Windows with no correlatable
+/// content, or whose shifted span runs off `target`, are skipped, so the map may
+/// be sparser than the number of windows that fit.
 ///
 /// # Errors
 ///
 /// [`SyncError::EmptySignal`] if either signal is empty,
-/// [`SyncError::SignalShorterThanWindow`] if neither holds one full window,
-/// [`SyncError::NoPeak`] if windows fit but none correlated, and any genuine
-/// per-window error from [`align`](crate::align), e.g. [`SyncError::Fft`].
+/// [`SyncError::SignalShorterThanWindow`] if `reference` holds no full window,
+/// [`SyncError::NoWindowInBounds`] if no window's base-shifted span falls within
+/// `target` (the `base` is inconsistent with the lengths, or `target` is shorter
+/// than a window), [`SyncError::NoPeak`] if windows were correlated but none
+/// peaked, [`SyncError::SignalTooLong`] if a window start or composed offset is
+/// unrepresentable, and any genuine per-window error from [`align`](crate::align),
+/// e.g. [`SyncError::Fft`].
 pub fn drift_map(
     reference: &[f32],
     target: &[f32],
     rate: SampleRate,
+    base: SyncOffset,
     window: DriftWindow,
     method: CorrelationMethod,
 ) -> Result<DriftMap, SyncError> {
@@ -117,27 +126,39 @@ pub fn drift_map(
 
     let length = window.length.get();
     let hop = window.hop.get();
+    let base_samples = base.samples();
     let mut points = Vec::new();
     let mut any_window = false;
+    let mut any_correlated = false;
     let mut start = 0_usize;
-    while let Some((reference_window, target_window)) = windows_at(reference, target, start, length)
-    {
+    while let Some(reference_window) = window_at(reference, start, length) {
         any_window = true;
-        // A window over dead air (or otherwise uncorrelatable content) yields no
-        // measurement: skip it and carry on, rather than abort the whole map. A
-        // drift map is a sparse sampling and raw footage is full of pauses, so a
-        // silent window is the norm, not a failure — the consumer interpolates
-        // across the gaps. Genuine errors (FFT, overflow) still propagate.
-        match align(reference_window, target_window, rate, method) {
-            Ok(offset) => {
-                let at = Seconds::from_samples(
-                    i64::try_from(start).map_err(|_| SyncError::SignalTooLong)?,
-                    rate,
-                );
-                points.push(DriftPoint { at, offset });
+        // Correlate against the target span shifted by the coarse `base`, so each
+        // window measures only the small residual drift, not the whole lag — the
+        // window then need only exceed the drift, not the total offset. A window
+        // whose shifted span runs off either end of `target` (before its start or
+        // past its end), or one over dead air (NoPeak), yields no point and is
+        // skipped: a drift map is a sparse sampling the consumer interpolates
+        // across. Genuine errors propagate.
+        if let Some(target_window) = shifted_window(target, start, base_samples, length) {
+            any_correlated = true;
+            match align(reference_window, target_window, rate, method) {
+                Ok(residual) => {
+                    let total = base_samples
+                        .checked_add(residual.samples())
+                        .ok_or(SyncError::SignalTooLong)?;
+                    let at = Seconds::from_samples(
+                        i64::try_from(start).map_err(|_| SyncError::SignalTooLong)?,
+                        rate,
+                    );
+                    points.push(DriftPoint {
+                        at,
+                        offset: SyncOffset::from_samples(total, rate),
+                    });
+                }
+                Err(SyncError::NoPeak) => {}
+                Err(other) => return Err(other),
             }
-            Err(SyncError::NoPeak) => {}
-            Err(other) => return Err(other),
         }
 
         let Some(next) = start.checked_add(hop) else {
@@ -149,22 +170,30 @@ pub fn drift_map(
     if !any_window {
         return Err(SyncError::SignalShorterThanWindow);
     }
+    if !any_correlated {
+        return Err(SyncError::NoWindowInBounds);
+    }
     if points.is_empty() {
         return Err(SyncError::NoPeak);
     }
     Ok(DriftMap { points })
 }
 
-/// The `length`-sample slice of each signal starting at `start`, or `None` once
-/// either signal has no full window left (or the span overflows `usize`).
-fn windows_at<'a>(
-    reference: &'a [f32],
-    target: &'a [f32],
-    start: usize,
-    length: usize,
-) -> Option<(&'a [f32], &'a [f32])> {
+/// The `length`-sample slice of `signal` starting at `start`, or `None` if the
+/// signal has no full window left there (or the span overflows `usize`).
+fn window_at(signal: &[f32], start: usize, length: usize) -> Option<&[f32]> {
     let end = start.checked_add(length)?;
-    Some((reference.get(start..end)?, target.get(start..end)?))
+    signal.get(start..end)
+}
+
+/// The `length`-sample slice of `target` for the reference window at `start`,
+/// shifted by the coarse `base` offset of `samples`. `None` if the shifted span
+/// falls outside `target` — before its start (a negative position) or past its
+/// end — so that window yields no point.
+fn shifted_window(target: &[f32], start: usize, samples: i64, length: usize) -> Option<&[f32]> {
+    let shifted = i64::try_from(start).ok()?.checked_add(samples)?;
+    let target_start = usize::try_from(shifted).ok()?;
+    window_at(target, target_start, length)
 }
 
 #[cfg(test)]
@@ -196,20 +225,29 @@ mod tests {
         DriftWindow::new(2_000, 2_000).unwrap()
     }
 
+    /// The coarse base offset a caller would pass, from one global [`align`].
+    fn base(samples: i64) -> SyncOffset {
+        SyncOffset::from_samples(samples, rate())
+    }
+
     fn offsets(map: &DriftMap) -> Vec<i64> {
         map.points().iter().map(|p| p.offset().samples()).collect()
     }
 
     #[test]
     fn constant_offset_is_measured_in_every_window() {
-        // Features every 2000 samples, target a flat 100 samples later: no drift.
+        // Target a flat 100 samples later. With the base set to that offset, every
+        // residual is zero and so every total is 100 — no drift. The target runs
+        // `base` longer than the reference because it lags by that much: the
+        // reference's last window needs target samples `base` past its own end.
         let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
-        let target = with_features(8_000, &[1_100, 3_100, 5_100, 7_100]);
+        let target = with_features(8_100, &[1_100, 3_100, 5_100, 7_100]);
 
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(100),
             window(),
             CorrelationMethod::CrossCorrelation,
         )
@@ -219,15 +257,16 @@ mod tests {
 
     #[test]
     fn growing_lag_shows_up_as_drift() {
-        // The target's feature falls progressively further behind: the per-window
-        // offset grows 50 -> 60 -> 70 -> 80, recovering the drift.
+        // Base 50, target falling further behind: residuals 0/10/20/30 give totals
+        // that grow 50 -> 60 -> 70 -> 80, recovering the drift.
         let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
-        let target = with_features(8_000, &[1_050, 3_060, 5_070, 7_080]);
+        let target = with_features(8_100, &[1_050, 3_060, 5_070, 7_080]);
 
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(50),
             window(),
             CorrelationMethod::CrossCorrelation,
         )
@@ -238,14 +277,15 @@ mod tests {
     #[test]
     fn shrinking_lag_shows_up_as_drift() {
         // The mirror case: the target's clock runs fast, so the lag shrinks
-        // 80 -> 70 -> 60 -> 50 across the recording — drift is directional.
+        // 80 -> 70 -> 60 -> 50 — residuals around base 80 are 0/-10/-20/-30.
         let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
-        let target = with_features(8_000, &[1_080, 3_070, 5_060, 7_050]);
+        let target = with_features(8_100, &[1_080, 3_070, 5_060, 7_050]);
 
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(80),
             window(),
             CorrelationMethod::CrossCorrelation,
         )
@@ -254,14 +294,57 @@ mod tests {
     }
 
     #[test]
-    fn points_carry_ascending_window_start_times() {
-        let reference = with_features(6_000, &[1_000, 3_000, 5_000]);
-        let target = with_features(6_000, &[1_100, 3_100, 5_100]);
+    fn a_short_window_handles_a_large_base_offset() {
+        // The point of measuring residual around a base: a 5000-sample base — far
+        // larger than the 2000-sample window — still resolves, because each window
+        // aligns against the target span shifted by the base. The old same-span
+        // approach would hold non-overlapping content and fail. Totals are
+        // 5000 plus the 0/10/20/30 drift.
+        let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
+        let target = with_features(13_000, &[6_000, 8_010, 10_020, 12_030]);
 
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(5_000),
+            window(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
+        assert_eq!(offsets(&map), vec![5_000, 5_010, 5_020, 5_030]);
+    }
+
+    #[test]
+    fn a_negative_base_offset_is_measured() {
+        // The target leads the reference by 4000 samples (base -4000). The early
+        // windows' shifted spans fall before the start of `target` and are
+        // skipped; the window that lands on the feature measures a -4000 total.
+        let reference = with_features(8_000, &[5_000]);
+        let target = with_features(8_000, &[1_000]);
+
+        let map = drift_map(
+            &reference,
+            &target,
+            rate(),
+            base(-4_000),
+            window(),
+            CorrelationMethod::CrossCorrelation,
+        )
+        .unwrap();
+        assert_eq!(offsets(&map), vec![-4_000]);
+    }
+
+    #[test]
+    fn points_carry_ascending_window_start_times() {
+        let reference = with_features(6_000, &[1_000, 3_000, 5_000]);
+        let target = with_features(6_100, &[1_100, 3_100, 5_100]);
+
+        let map = drift_map(
+            &reference,
+            &target,
+            rate(),
+            base(100),
             window(),
             CorrelationMethod::CrossCorrelation,
         )
@@ -281,13 +364,14 @@ mod tests {
     fn overlapping_windows_advance_by_the_hop() {
         // Window 2000, hop 1000 over 4000 samples yields windows at 0, 1000, 2000.
         let reference = with_features(4_000, &[500, 2_500]);
-        let target = with_features(4_000, &[520, 2_520]);
+        let target = with_features(4_100, &[520, 2_520]);
         let overlapping = DriftWindow::new(2_000, 1_000).unwrap();
 
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(20),
             overlapping,
             CorrelationMethod::CrossCorrelation,
         )
@@ -321,6 +405,7 @@ mod tests {
                 &reference,
                 &target,
                 rate(),
+                base(20),
                 window(),
                 CorrelationMethod::CrossCorrelation
             ),
@@ -336,6 +421,7 @@ mod tests {
                 &[],
                 &target,
                 rate(),
+                base(0),
                 window(),
                 CorrelationMethod::CrossCorrelation
             ),
@@ -345,15 +431,16 @@ mod tests {
 
     #[test]
     fn a_silent_window_is_skipped_not_fatal() {
-        // The first window [0, 2000) is silent; the second [2000, 4000) holds a
-        // feature. The silent window yields no point but does not abort the map —
-        // the correlated window is still measured.
-        let reference = with_features(4_000, &[2_500]);
-        let target = with_features(4_000, &[2_550]);
+        // The first window [0, 2000) is silent; the window at 2000 holds a feature.
+        // The silent window yields no point but does not abort the map — the
+        // correlated window is still measured.
+        let reference = with_features(6_000, &[2_500]);
+        let target = with_features(6_000, &[2_550]);
         let map = drift_map(
             &reference,
             &target,
             rate(),
+            base(50),
             window(),
             CorrelationMethod::CrossCorrelation,
         )
@@ -373,10 +460,53 @@ mod tests {
                 &silence,
                 &silence,
                 rate(),
+                base(0),
                 window(),
                 CorrelationMethod::CrossCorrelation
             ),
             Err(SyncError::NoPeak)
+        ));
+    }
+
+    #[test]
+    fn a_base_beyond_the_target_has_no_window_in_bounds() {
+        // Both signals carry correlatable content, but the base is so much larger
+        // than `target` that every window's shifted span runs off its end — align
+        // is never called. That is a geometry failure (a base inconsistent with
+        // the lengths), surfaced as NoWindowInBounds, not NoPeak (which would
+        // falsely claim the audio doesn't correlate).
+        let reference = with_features(8_000, &[1_000, 3_000, 5_000, 7_000]);
+        let target = with_features(5_000, &[1_100]);
+        assert!(matches!(
+            drift_map(
+                &reference,
+                &target,
+                rate(),
+                base(100_000),
+                window(),
+                CorrelationMethod::CrossCorrelation
+            ),
+            Err(SyncError::NoWindowInBounds)
+        ));
+    }
+
+    #[test]
+    fn a_target_shorter_than_the_window_has_no_window_in_bounds() {
+        // The reference holds full windows but the target is shorter than one, so
+        // no window's span (even at base 0) fits inside it. Distinct from a short
+        // *reference* (SignalShorterThanWindow): here the reference is fine.
+        let reference = with_features(4_000, &[500, 2_500]);
+        let target = with_features(1_000, &[120]);
+        assert!(matches!(
+            drift_map(
+                &reference,
+                &target,
+                rate(),
+                base(0),
+                window(),
+                CorrelationMethod::CrossCorrelation
+            ),
+            Err(SyncError::NoWindowInBounds)
         ));
     }
 }
