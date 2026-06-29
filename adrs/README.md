@@ -16,3 +16,4 @@ Filename: `adrs/NNNN-kebab-title.md`. Sections: **Status**, **Context**,
 - [0005 — egui/eframe (wgpu) for the desktop GUI](./0005-egui-desktop-gui.md)
 - [0006 — Audio post-processing renders stems, not NLE-native filters](./0006-audio-post-processing-stems.md)
 - [0007 — Auto-framing emits NLE-native keyframed transforms, not baked video](./0007-auto-framing-native-transforms.md)
+- [0008 — Threading typed data through the pipeline stages](./0008-pipeline-stage-data-threading.md)

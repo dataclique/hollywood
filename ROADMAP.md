@@ -126,6 +126,11 @@ app and CLI drive the same code. Depends on everything above.
       dead air between them —
       [#55](https://github.com/dataclique/hollywood/issues/55)
       ([#56](https://github.com/dataclique/hollywood/pull/56))
+- [x] Inter-stage data-flow design — how typed state threads probe → … → export,
+      so an out-of-order run is unrepresentable
+      ([ADR 0008](./adrs/0008-pipeline-stage-data-threading.md)) —
+      [#65](https://github.com/dataclique/hollywood/issues/65)
+      ([#66](https://github.com/dataclique/hollywood/pull/66))
 - [ ] Stage chain: wire probe → detect → sync → assemble IR → export (the
       `assemble` building block now exists; the data-threaded wiring does not)
 
