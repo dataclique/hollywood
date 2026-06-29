@@ -120,7 +120,7 @@ pub enum TrackItem {
 }
 
 impl TrackItem {
-    fn as_clip(&self) -> Option<&Clip> {
+    pub(crate) fn as_clip(&self) -> Option<&Clip> {
         match self {
             Self::Clip(clip) => Some(clip),
             Self::Gap(_) | Self::Transition(_) => None,
@@ -204,25 +204,37 @@ impl Track {
     /// consume more of one than exists).
     pub fn validate(&self) -> Result<(), TimelineError> {
         self.occupied()?;
-        for (index, item) in self.items.iter().enumerate() {
-            let TrackItem::Transition(transition) = item else {
-                continue;
-            };
-            let prev_clip = index
-                .checked_sub(1)
-                .and_then(|prev| self.items.get(prev))
-                .and_then(TrackItem::as_clip);
-            let next_clip = index
-                .checked_add(1)
-                .and_then(|next| self.items.get(next))
-                .and_then(TrackItem::as_clip);
-            let (Some(prev_clip), Some(next_clip)) = (prev_clip, next_clip) else {
-                return Err(TimelineError::MisplacedTransition);
-            };
-            let fade = transition.duration();
-            if fade > prev_clip.duration() || fade > next_clip.duration() {
-                return Err(TimelineError::CrossFadeTooLong);
-            }
+        self.items
+            .iter()
+            .enumerate()
+            .filter_map(|(index, item)| match item {
+                TrackItem::Transition(transition) => Some((index, transition)),
+                TrackItem::Clip(_) | TrackItem::Gap(_) => None,
+            })
+            .try_for_each(|(index, transition)| self.validate_transition(index, transition))
+    }
+
+    /// Validate the transition at `index`: it must sit between two clips, and as
+    /// an overlap it cannot be longer than either clip it joins.
+    fn validate_transition(
+        &self,
+        index: usize,
+        transition: &Transition,
+    ) -> Result<(), TimelineError> {
+        let prev_clip = index
+            .checked_sub(1)
+            .and_then(|prev| self.items.get(prev))
+            .and_then(TrackItem::as_clip);
+        let next_clip = index
+            .checked_add(1)
+            .and_then(|next| self.items.get(next))
+            .and_then(TrackItem::as_clip);
+        let (Some(prev_clip), Some(next_clip)) = (prev_clip, next_clip) else {
+            return Err(TimelineError::MisplacedTransition);
+        };
+        let fade = transition.duration();
+        if fade > prev_clip.duration() || fade > next_clip.duration() {
+            return Err(TimelineError::CrossFadeTooLong);
         }
         Ok(())
     }
