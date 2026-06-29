@@ -11,21 +11,26 @@
 //!
 //! Scope of this first slice (the rest follows per ADR 0008):
 //!
-//! - the probe/decode front that turns source files into the [`Decoded`] entry
-//!   state is not here — `run_flow` takes `Decoded` directly;
+//! - the probe/decode front that produces the [`Decoded`] entry state from a
+//!   source file lives in the `source` module; `run_flow` takes `Decoded`
+//!   directly;
 //! - `sync` is a single-source pass-through; cross-source alignment (via
 //!   `align`/`drift_map`) lands with multi-source input;
-//! - the keep regions are threaded through unchanged, so the chosen analysis
-//!   window must land clip boundaries on whole frames for the frame-based
-//!   exporters — conforming arbitrary-granularity regions to frame boundaries is
-//!   a follow-up.
+//! - the keep regions are conformed to whole frames before assembly
+//!   ([`conform_to_frames`]), so any analysis window exports cleanly **when the
+//!   source duration is itself a whole number of frames**; a samples-derived
+//!   source duration that is not frame-aligned is the remaining gap (a region
+//!   reaching the source end clamps to that off-frame boundary) — a follow-up.
 
+use itertools::Itertools;
 use thiserror::Error;
 
 use hollywood_assemble::assemble;
 use hollywood_detect::{SilenceGate, keep_regions};
 use hollywood_nle::{to_fcpxml, to_otio, to_xmeml};
-use hollywood_timeline::{FrameRate, MediaAsset, SampleRate, Seconds, TimeRange, Timeline};
+use hollywood_timeline::{
+    FrameRate, MediaAsset, SampleRate, Seconds, TimeRange, Timeline, TimelineError,
+};
 
 use crate::error::PipelineError;
 use crate::progress::ProgressReporter;
@@ -215,13 +220,59 @@ fn assemble_stage(
     synced: Synced,
     config: &FlowConfig,
 ) -> Result<Assembled, hollywood_assemble::AssembleError> {
+    let source = synced.asset.duration();
+    let regions = conform_to_frames(&synced.regions, config.frame_rate, source)?;
     let timeline = assemble(
         config.name.as_str(),
         config.frame_rate,
         synced.asset,
-        &synced.regions,
+        &regions,
     )?;
     Ok(Assembled { timeline })
+}
+
+/// Snap each keep region out to whole `rate` frames — start floored, end ceiled
+/// so no speech is clipped — clamped to the `source` duration, then merge any
+/// regions that now touch or overlap. The frame-based NLE exporters require clip
+/// boundaries on whole frames; this conforms the sample-precise regions to the
+/// output frame grid.
+///
+/// This is exact only when `source` is itself a whole number of frames: a region
+/// reaching the source end clamps to `source`, so a samples-derived source
+/// duration that is not frame-aligned leaves that one clip boundary off-frame,
+/// which every exporter rejects. Conforming the source duration too is a
+/// follow-up.
+fn conform_to_frames(
+    regions: &[TimeRange],
+    rate: FrameRate,
+    source: Seconds,
+) -> Result<Vec<TimeRange>, TimelineError> {
+    regions
+        .iter()
+        .map(|region| {
+            let start = Seconds::from_frames(region.start().frame_floor(rate), rate);
+            let end = Seconds::from_frames(region.end().frame_ceil(rate), rate).min(source);
+            (start, end)
+        })
+        .coalesce(|(start, end), (next_start, next_end)| {
+            // Snapping out can push a region onto its predecessor; fuse the two
+            // whenever the next one starts at or before this one ends.
+            if next_start <= end {
+                Ok((start, end.max(next_end)))
+            } else {
+                Err(((start, end), (next_start, next_end)))
+            }
+        })
+        .map(|(start, end)| frame_range(start, end))
+        .collect()
+}
+
+/// The `[start, end)` range, computing the duration without overflow.
+fn frame_range(start: Seconds, end: Seconds) -> Result<TimeRange, TimelineError> {
+    let duration = end
+        .checked_sub(start)
+        .ok_or(TimelineError::TimeRangeOverflow)?;
+    TimeRange::new(start, duration)
 }
 
 fn export(assembled: Assembled, config: &FlowConfig) -> Result<Exported, hollywood_nle::NleError> {
@@ -304,6 +355,19 @@ mod tests {
                 let in_tone = loud
                     .iter()
                     .any(|&(start, end)| frame >= start && frame < end);
+                if in_tone { 0.8 } else { 0.0 }
+            })
+            .collect()
+    }
+
+    /// `len` samples with `0.8`-amplitude tone over each `[start, end)` **sample**
+    /// span — for placing tone off the frame grid.
+    fn tone_over_samples(len: usize, loud: &[(usize, usize)]) -> Vec<f32> {
+        (0..len)
+            .map(|sample| {
+                let in_tone = loud
+                    .iter()
+                    .any(|&(start, end)| sample >= start && sample < end);
                 if in_tone { 0.8 } else { 0.0 }
             })
             .collect()
@@ -476,15 +540,13 @@ mod tests {
 
     #[test]
     fn an_export_failure_surfaces_as_an_export_stage_error() {
-        // The gate analyzes in 1/30-s frames but the sequence is 25 fps, so the
-        // clip boundaries are not whole 25-fps frames. assemble does not snap to
-        // frames, so the run reaches export, where every exporter rejects the
-        // unaligned durations — and the flow must label it an Export failure, not
-        // mislabel it as an earlier stage.
+        // A fractional (NTSC) sequence rate assembles fine but no exporter
+        // supports it, so the run reaches export and fails there — the flow must
+        // label it an Export failure, not mislabel it as an earlier stage.
         let config = FlowConfig {
             name: "rough cut".to_owned(),
             gate: frame_gate(),
-            frame_rate: FrameRate::whole(25).unwrap(),
+            frame_rate: FrameRate::new(30_000, 1_001).unwrap(),
             targets: vec![ExportTarget::Xmeml],
         };
         let reporter = ProgressReporter::new();
@@ -542,5 +604,54 @@ mod tests {
             Decoded::new(too_long, samples, rate()),
             Err(FlowError::DurationMismatch { .. })
         ));
+    }
+
+    #[test]
+    fn conform_snaps_regions_out_to_whole_frames_and_merges_overlaps() {
+        let rate = FrameRate::whole(FPS).unwrap();
+        let source = Seconds::from_frames(10, rate);
+        // Two off-frame regions: [0.5, 2.5) frames and [3.5, 5.5) frames. Snapping
+        // out gives [0, 3) and [3, 6), which touch and merge into [0, 6).
+        let regions = vec![
+            TimeRange::new(Seconds::new(1, 60).unwrap(), Seconds::new(1, 15).unwrap()).unwrap(),
+            TimeRange::new(Seconds::new(7, 60).unwrap(), Seconds::new(1, 15).unwrap()).unwrap(),
+        ];
+
+        let conformed = conform_to_frames(&regions, rate, source).unwrap();
+
+        assert_eq!(conformed.len(), 1);
+        assert_eq!(conformed[0].start(), Seconds::ZERO);
+        assert_eq!(conformed[0].end(), Seconds::from_frames(6, rate));
+    }
+
+    #[test]
+    fn a_non_frame_aligned_window_exports_after_conforming() {
+        // A 1/50 s analysis window does not divide the 30 fps grid, so the detected
+        // region lands off-frame (tone over samples 3840..7680). Without
+        // conforming, export would fail with UnalignedDuration; conforming snaps
+        // the clip to whole frames so the frame-based exporter accepts it.
+        let samples = tone_over_samples(15 * FRAME_SAMPLES, &[(3_840, 7_680)]);
+        let decoded = Decoded::new(audio_asset(samples.len()), samples, rate()).unwrap();
+        let off_grid = FlowConfig {
+            name: "rough cut".to_owned(),
+            gate: SilenceGate::new(
+                Seconds::new(1, 50).unwrap(),
+                Dbfs::new(-40.0),
+                Seconds::ZERO,
+            )
+            .unwrap(),
+            frame_rate: FrameRate::whole(FPS).unwrap(),
+            targets: vec![ExportTarget::Xmeml],
+        };
+        let reporter = ProgressReporter::new();
+
+        let exported = run_flow(decoded, &off_grid, &reporter).unwrap();
+
+        // The off-grid region conforms to a single whole-frame clip — one clipitem,
+        // not zero (dropped) or two (split) — and exporting at all proves the
+        // snapped boundaries are frame-aligned, since the exporter rejects an
+        // off-frame duration.
+        let (_, xmeml) = exported.documents().first().unwrap();
+        assert_eq!(xmeml.matches("<clipitem").count(), 1);
     }
 }

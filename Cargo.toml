@@ -48,6 +48,7 @@ apalis = "0.7.4"
 apalis-sql = { version = "0.7.4", features = ["sqlite"] }
 num-rational = "0.4"
 num-traits = "0.2"
+itertools = "0.15.0"
 proptest = "1"
 quick-xml = "0.40"
 

@@ -13,6 +13,7 @@ hollywood-detect.workspace = true
 hollywood-ffmpeg.workspace = true
 hollywood-nle.workspace = true
 hollywood-timeline.workspace = true
+itertools.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["sync"] }
 

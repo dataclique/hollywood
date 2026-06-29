@@ -139,8 +139,10 @@ app and CLI drive the same code. Depends on everything above.
       `Decoded` entry state from a source file (single source), so the pipeline
       runs from disk — [#71](https://github.com/dataclique/hollywood/issues/71)
       ([#72](https://github.com/dataclique/hollywood/pull/72))
-- [ ] Conform keep regions to whole frames so arbitrary silence-gate windows
-      export cleanly (today the window must land clip boundaries on frames)
+- [x] Conform keep regions to whole frames so arbitrary silence-gate windows
+      export cleanly — [#73](https://github.com/dataclique/hollywood/issues/73)
+      ([#74](https://github.com/dataclique/hollywood/pull/74)) (a non-frame
+      source duration still needs conforming — a follow-up)
 - [ ] Multi-source: probe/decode several sources and align them with
       cross-source sync before assembling
 
