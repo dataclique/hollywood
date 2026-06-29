@@ -139,6 +139,12 @@ app and CLI drive the same code. Depends on everything above.
       `Decoded` entry state from a source file (single source), so the pipeline
       runs from disk — [#71](https://github.com/dataclique/hollywood/issues/71)
       ([#72](https://github.com/dataclique/hollywood/pull/72))
+- [ ] Conform keep regions to whole frames so arbitrary silence-gate windows
+      export cleanly (today the window must land clip boundaries on frames)
+- [x] Multi-source threading design — how N sources thread `Sources → Synced →`
+      multi-track `Assembled`, with a union-of-speech cut and a sync anchor
+      ([ADR 0009](./adrs/0009-multi-source-sync-assembly.md)) —
+      [#77](https://github.com/dataclique/hollywood/issues/77)
 - [x] Conform keep regions to whole frames so arbitrary silence-gate windows
       export cleanly — [#73](https://github.com/dataclique/hollywood/issues/73)
       ([#74](https://github.com/dataclique/hollywood/pull/74)) (a non-frame
