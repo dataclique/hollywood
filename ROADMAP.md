@@ -105,6 +105,10 @@ Timeline IR (to express keep/cut regions and offsets).
       each window, so a drifting clock shows as an offset that changes over time
       — [#57](https://github.com/dataclique/hollywood/issues/57)
       ([#60](https://github.com/dataclique/hollywood/pull/60))
+- [x] Drift map measures residual drift around a coarse base offset, so sources
+      that start far apart align without an oversized window —
+      [#61](https://github.com/dataclique/hollywood/issues/61)
+      ([#62](https://github.com/dataclique/hollywood/pull/62))
 
 ## Pipeline orchestration
 
