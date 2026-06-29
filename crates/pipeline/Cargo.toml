@@ -10,6 +10,7 @@ description = "Pipeline orchestration: run the probe → detect → sync → ass
 [dependencies]
 hollywood-assemble.workspace = true
 hollywood-detect.workspace = true
+hollywood-ffmpeg.workspace = true
 hollywood-nle.workspace = true
 hollywood-timeline.workspace = true
 thiserror.workspace = true

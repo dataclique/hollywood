@@ -3,7 +3,7 @@
 /// A stage of the pipeline, from raw footage to exported timeline.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PipelineStage {
-    /// Read each source's duration and stream properties.
+    /// Read each source's stream properties and decode its audio for analysis.
     Probe,
     /// Detect speech vs dead air to find the keep regions.
     Detect,

@@ -17,10 +17,12 @@ mod error;
 mod flow;
 mod orchestrate;
 mod progress;
+mod source;
 mod stage;
 
 pub use error::PipelineError;
 pub use flow::{Decoded, ExportTarget, Exported, FlowConfig, FlowError, run_flow};
 pub use orchestrate::run_pipeline;
 pub use progress::{ProgressReporter, ProgressSubscription, RunProgress};
+pub use source::{SourceError, decode_source, run};
 pub use stage::PipelineStage;

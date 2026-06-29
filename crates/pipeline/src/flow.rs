@@ -244,7 +244,7 @@ fn render(target: ExportTarget, timeline: &Timeline) -> Result<String, hollywood
 
 /// Run a stage's `result`, reporting failure and wrapping the native error in
 /// [`PipelineError::Stage`] so each stage's distinct error surfaces uniformly.
-fn wrap<T, E>(
+pub(crate) fn wrap<T, E>(
     reporter: &ProgressReporter,
     stage: PipelineStage,
     result: Result<T, E>,
