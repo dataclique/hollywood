@@ -135,9 +135,14 @@ app and CLI drive the same code. Depends on everything above.
       assemble → export over decoded audio, with progress and fail-fast (ADR
       0008) — [#69](https://github.com/dataclique/hollywood/issues/69)
       ([#70](https://github.com/dataclique/hollywood/pull/70))
-- [ ] Stage chain front: the probe → decode transforms that produce the `flow`'s
-      `Decoded` entry state from source files, plus multi-source cross-source
-      sync and conforming keep regions to whole frames for the exporters
+- [x] Stage chain front: the probe → decode transforms produce the `flow`'s
+      `Decoded` entry state from a source file (single source), so the pipeline
+      runs from disk — [#71](https://github.com/dataclique/hollywood/issues/71)
+      ([#72](https://github.com/dataclique/hollywood/pull/72))
+- [ ] Conform keep regions to whole frames so arbitrary silence-gate windows
+      export cleanly (today the window must land clip boundaries on frames)
+- [ ] Multi-source: probe/decode several sources and align them with
+      cross-source sync before assembling
 
 ## Desktop app + CLI
 
