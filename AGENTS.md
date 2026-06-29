@@ -191,6 +191,20 @@ and `indexing_slicing` are **denied** outside tests; `clippy::pedantic` and
   the type system to make invalid states unrepresentable — a malformed timeline,
   a clip outside its track's bounds, or a negative duration should not be
   constructible.
+- **Iterator-first, immutable by default.** Express a transformation as an
+  iterator chain rather than a mutable accumulator: a build-then-`push` loop is
+  `.map(..).collect()` / `.extend(..)`; a running total is `.fold` / `.sum` /
+  `.try_fold`; index arithmetic with a bounds-checked lookup is `.enumerate()` /
+  `.zip()` / `.skip()` / `.windows()`; fallible elements are
+  `.collect::<Result<_, _>>()`, never a chain that silently drops the error.
+  Reach for a `let` binding over `let mut` whenever an expression or chain
+  produces the value. This is a readability rule, not a dogma: keep a `for` loop
+  where it carries genuine state across iterations, drives `.await`, emits I/O,
+  or breaks early on a condition a combinator would obscure — a stateful demux
+  loop, the async stage orchestrator, and an XML-emit loop all read clearer
+  imperative. Convert only when the iterator form is both behavior-identical and
+  genuinely clearer; a change that just shuffles a loop into a combinator
+  without improving it is overhead.
 - **No boolean blindness.** Prefer discriminated unions
   (`enum Fade { In, Out }`) over bare `bool`s; when a boolean is unavoidable,
   wrap it in named constructors rather than exposing `set_x(true/false)`.
