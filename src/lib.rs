@@ -7,6 +7,7 @@
 //! sync/detection, and the `egui` desktop shell arrive in dedicated workspace
 //! crates.
 
+pub mod cli;
 pub mod media;
 
 use thiserror::Error;
