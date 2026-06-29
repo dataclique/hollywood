@@ -104,7 +104,7 @@ Timeline IR (to express keep/cut regions and offsets).
 - [x] Piecewise drift map for long recordings — window the recording and align
       each window, so a drifting clock shows as an offset that changes over time
       — [#57](https://github.com/dataclique/hollywood/issues/57)
-      ([#58](https://github.com/dataclique/hollywood/pull/58))
+      ([#60](https://github.com/dataclique/hollywood/pull/60))
 
 ## Pipeline orchestration
 
