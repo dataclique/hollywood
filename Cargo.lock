@@ -1996,6 +1996,10 @@ dependencies = [
 name = "hollywood-pipeline"
 version = "0.1.0"
 dependencies = [
+ "hollywood-assemble",
+ "hollywood-detect",
+ "hollywood-nle",
+ "hollywood-timeline",
  "thiserror 2.0.18",
  "tokio",
 ]

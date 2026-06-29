@@ -62,9 +62,11 @@ ffmpeg-next = "8"
 realfft = "3.5.0"
 
 # Intra-workspace crates.
+hollywood-assemble.path = "crates/assemble"
 hollywood-detect.path = "crates/detect"
 hollywood-ffmpeg.path = "crates/ffmpeg"
 hollywood-gui.path = "crates/gui"
+hollywood-nle.path = "crates/nle"
 hollywood-sync.path = "crates/sync"
 hollywood-timeline.path = "crates/timeline"
 
