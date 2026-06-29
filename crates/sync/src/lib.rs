@@ -14,9 +14,16 @@
 //! Callers pick a [`CorrelationMethod`]: [`CorrelationMethod::CrossCorrelation`]
 //! for plain correlation, or [`CorrelationMethod::Phat`] (GCC-PHAT) to whiten the
 //! spectrum for a sharp, amplitude-invariant peak on colored or low-SNR material.
+//!
+//! One offset assumes the two clocks tick at the same rate. Over a long take they
+//! drift, so [`drift_map`] aligns successive windows into a [`DriftMap`] — the
+//! offset sampled over time — letting the assembler correct drift rather than
+//! assume a fixed lag.
 
 mod alignment;
+mod drift;
 mod error;
 
 pub use alignment::{CorrelationMethod, SyncOffset, align};
+pub use drift::{DriftMap, DriftPoint, DriftWindow, drift_map};
 pub use error::SyncError;
